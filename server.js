@@ -12,25 +12,32 @@ const path = require("path");
 const app = express();
 
 // -----------------------------
-// 1. Initialize Firebase
+// 1. Initialize Firebase (Using Render ENV variables)
 // -----------------------------
-const serviceAccountPath = process.env.FIREBASE_SERVICE_ACCOUNT || "./serviceAccountKey.json";
+const admin = require("firebase-admin");
 
-if (!fs.existsSync(serviceAccountPath)) {
-  console.warn("Warning: Firebase service account not found:", serviceAccountPath);
-}
+const serviceAccount = {
+  type: process.env.type,
+  project_id: process.env.project_id,
+  private_key_id: process.env.private_key_id,
+  private_key: process.env.private_key ? process.env.private_key.replace(/\\n/g, '\n') : undefined,
+  client_email: process.env.client_email,
+  client_id: process.env.client_id,
+  auth_uri: process.env.auth_uri,
+  token_uri: process.env.token_uri,
+  auth_provider_x509_cert_url: process.env.auth_provider_x509_cert_url,
+  client_x509_cert_url: process.env.client_x509_cert_url,
+  universe_domain: process.env.universe_domain
+};
 
 try {
-  const svc = require(path.resolve(serviceAccountPath));
-  admin.initializeApp({ credential: admin.credential.cert(svc) });
-} catch (err) {
-  try {
-    admin.initializeApp();
-  } catch (e) {
-    console.error("Firebase init error:", e.message);
-  }
+  admin.initializeApp({
+    credential: admin.credential.cert(serviceAccount),
+  });
+  console.log("Firebase initialized with ENV variables");
+} catch (error) {
+  console.error("Firebase initialization failed:", error.message);
 }
-
 // -----------------------------
 // 2. Paystack Webhook MUST come before express.json()
 // -----------------------------
