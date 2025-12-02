@@ -1,4 +1,4 @@
-const axios = require("../node_modules/axios/index.d.cts");
+const axios = require("axios");
 
 // ENV VARIABLES
 const USER_ID = process.env.CLUBKONNECT_USER_ID;

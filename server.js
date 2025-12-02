@@ -2,7 +2,7 @@
 
 require("dotenv").config();
 const express = require("express");
-const axios = require("./node_modules/axios/index.d.cts");
+const axios = require("axios");
 const admin = require("firebase-admin");
 const bodyParser = require("body-parser");
 const cors = require("cors");
@@ -14,8 +14,6 @@ const app = express();
 // -----------------------------
 // 1. Initialize Firebase (Using Render ENV variables)
 // -----------------------------
-const admin = require("firebase-admin");
-
 const serviceAccount = {
   type: process.env.type,
   project_id: process.env.project_id,
