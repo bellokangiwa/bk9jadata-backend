@@ -31,20 +31,20 @@ if (!userId || !name || !email || !phone) {
     } else {
       // Create customer in Paystack
       const createCustomer = await axios.post(
-        "https://api.paystack.co/customer",
-        {
-          email,
-          first_name: name,
-          last_name: "",
-          phone: ""
-        },
-        {
-          headers: {
-            Authorization: `Bearer ${process.env.PAYSTACK_SECRET_KEY}`,
-            "Content-Type": "application/json"
-          }
-        }
-      );
+  "https://api.paystack.co/customer",
+  {
+    email,
+    first_name: name,
+    last_name: "",
+    phone: phone   // FIXED HERE
+  },
+  {
+    headers: {
+      Authorization: `Bearer ${process.env.PAYSTACK_SECRET_KEY}`,
+      "Content-Type": "application/json"
+    }
+  }
+);
 
       customer_code = createCustomer.data.data.customer_code;
 
