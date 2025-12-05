@@ -7,14 +7,15 @@ const db = admin.firestore();
 
 router.post("/create-dva", async (req, res) => {
   try {
-    const { userId, name, email } = req.body;
+    const { userId, name, email, phone } = req.body;
 
-    if (!userId || !name || !email) {
-      return res.status(400).json({
-        status: false,
-        message: "userId, name, email required"
-      });
-    }
+if (!userId || !name || !email || !phone) {
+  return res.status(400).json({
+    status: false,
+    message: "userId, name, email, phone required"
+  });
+}
+
 
     // ---------------------------------------------------
     // 1. CHECK IF PAYSTACK CUSTOMER EXISTS OR CREATE NEW
