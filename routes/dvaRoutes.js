@@ -93,17 +93,18 @@ const createCustomer = await axios.post(
     // 4. Save DVA to Firestore
     // -----------------------------------------
     await walletRef.set(
-      {
-        dva: {
-          account_number: dva.account_number,
-          bank_name: dva.bank.name,
-          bank_id: dva.bank.id,
-          paystack_dva_id: dva.id,
-          customer_id: dva.customer_id,
-        }
-      },
-      { merge: true }
-    );
+  {
+    dva: {
+      account_number: dva.account_number,
+      bank_name: dva.bank.name,
+      bank_id: dva.bank.id,
+      paystack_dva_id: dva.id,
+      customer_id: dva.customer?.id || null,
+      customer_code: dva.customer?.customer_code || null
+    }
+  },
+  { merge: true }
+);
 
     // -----------------------------------------
     // 5. Success Response
