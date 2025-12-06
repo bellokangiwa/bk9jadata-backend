@@ -34,15 +34,18 @@ router.post("/create-dva", async (req, res) => {
     } else {
 
       // -----------------------------------------
-      // 2. Create Paystack customer WITH PHONE
-      // -----------------------------------------
-      const createCustomer = await axios.post(
+     // Normalize phone to +234 format
+const normalizedPhone = phone.startsWith("+234")
+  ? phone
+  : "+234" + phone.replace(/^0/, "");
+
+const createCustomer = await axios.post(
   "https://api.paystack.co/customer",
   {
     email,
     first_name: name,
     last_name: "",
-    mobile: phone   // Paystack NEW PARAM
+    phone: normalizedPhone
   },
   {
     headers: {
@@ -51,6 +54,7 @@ router.post("/create-dva", async (req, res) => {
     }
   }
 );
+
 
       customer_code = createCustomer.data.data.customer_code;
 
