@@ -37,20 +37,20 @@ router.post("/create-dva", async (req, res) => {
       // 2. Create Paystack customer WITH PHONE
       // -----------------------------------------
       const createCustomer = await axios.post(
-        "https://api.paystack.co/customer",
-        {
-          email,
-          first_name: name,
-          last_name: "",
-          phone: phone  // REQUIRED BY PAYSTACK
-        },
-        {
-          headers: {
-            Authorization: `Bearer ${process.env.PAYSTACK_SECRET_KEY}`,
-            "Content-Type": "application/json"
-          }
-        }
-      );
+  "https://api.paystack.co/customer",
+  {
+    email,
+    first_name: name,
+    last_name: "",
+    mobile: phone   // Paystack NEW PARAM
+  },
+  {
+    headers: {
+      Authorization: `Bearer ${process.env.PAYSTACK_SECRET_KEY}`,
+      "Content-Type": "application/json"
+    }
+  }
+);
 
       customer_code = createCustomer.data.data.customer_code;
 
