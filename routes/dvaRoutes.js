@@ -105,20 +105,28 @@ router.post("/create-dva", async (req, res) => {
 
     // Save DVA Details
     await walletRef.set(
-      {
-        dva: {
-          account_number: dva.account_number,
-          bank_name: dva.bank.name,
-          bank_id: dva.bank.id,
-          paystack_dva_id: dva.id,
-          customer_id: dva.customer.id,
-          customer_code: dva.customer.customer_code,
-          assigned_at: dva.assignment.assigned_at,
-          assignee_id: dva.assignment.assignee_id
-        }
-      },
-      { merge: true }
-    );
+  {
+    dva: {
+      account_number: dva.account_number,
+      account_name: dva.account_name,          // ADD THIS
+      bank_name: dva.bank.name,
+      bank_id: dva.bank.id,
+      bank_slug: dva.bank.slug,                // ADD THIS
+      currency: dva.currency,                  // ADD THIS
+      active: dva.active,                      // ADD THIS
+
+      paystack_dva_id: dva.id,
+      customer_id: dva.customer.id,
+      customer_code: dva.customer.customer_code,
+
+      assigned: dva.assigned,                  // ADD THIS
+      assigned_at: dva.assignment.assigned_at,
+      assignee_id: dva.assignment.assignee_id
+    }
+  },
+  { merge: true }
+);
+
 
     return res.json({
       status: true,
