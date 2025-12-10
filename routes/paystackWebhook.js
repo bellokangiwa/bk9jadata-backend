@@ -1,17 +1,17 @@
 const express = require("express");
 const admin = require("firebase-admin");
+const crypto = require("crypto");
 
 const router = express.Router();
 const db = admin.firestore();
 
-router.post("/webhook", express.json(), async (req, res) => {
+router.post("/", async (req, res) => {
   const event = req.body;
 
-  // Verify Paystack sends signature
-  const crypto = require("crypto");
+  // Verify Paystack signature
   const hash = crypto
     .createHmac("sha512", process.env.PAYSTACK_SECRET_KEY)
-    .update(JSON.stringify(req.body))
+    .update(req.body)
     .digest("hex");
 
   if (hash !== req.headers["x-paystack-signature"]) {
@@ -22,8 +22,8 @@ router.post("/webhook", express.json(), async (req, res) => {
     if (event.event === "dedicatedaccount_transaction") {
       const data = event.data;
 
-      const userId = data.metadata?.userId;  // You stored this during DVA creation
-      const amount = data.amount / 100;      // kobo → naira
+      const userId = data.metadata?.userId;
+      const amount = data.amount / 100; // kobo → naira
 
       if (!userId) return res.status(400).json({ message: "Missing userId" });
 
