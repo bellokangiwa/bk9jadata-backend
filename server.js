@@ -43,7 +43,7 @@ try {
 const webhook = require("./routes/webhook");
 app.post(
   "/webhook",
-  bodyParser.raw({ type: "*/*" }),
+  bodyParser.raw({ type: "application/json" }),
   webhook
 );
 
