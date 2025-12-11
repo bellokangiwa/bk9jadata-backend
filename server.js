@@ -12,7 +12,7 @@ const path = require("path");
 const app = express();
 
 // -----------------------------
-// 1. Initialize Firebase (Using Render ENV variables)
+// 1. Initialize Firebase
 // -----------------------------
 const serviceAccount = {
   type: process.env.type,
@@ -36,14 +36,15 @@ try {
 } catch (error) {
   console.error("Firebase initialization failed:", error.message);
 }
+
 // -----------------------------
-// 2. Paystack Webhook MUST come before express.json()
+// 2. Paystack Webhook (MUST be before express.json())
 // -----------------------------
-const paystackWebhook = require("./routes/paystackWebhook");
-app.use(
-  "/webhook/paystack",
-  bodyParser.raw({ type: "application/json" }),
-  paystackWebhook
+const webhook = require("./routes/webhook");
+app.post(
+  "/webhook",
+  bodyParser.raw({ type: "*/*" }),
+  webhook
 );
 
 // -----------------------------
