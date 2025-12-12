@@ -4,14 +4,26 @@ require("dotenv").config();
 
 const router = express.Router();
 
-router.post("/paystack-test", async (req, res) => {
+router.post("/paystack-init", async (req, res) => {
   try {
+    const { email, amount, userId } = req.body;
+
+    if (!email || !amount || !userId) {
+      return res.status(400).json({ error: "Missing fields" });
+    }
+
+    const payload = {
+      email: email,
+      amount: amount * 100, // Convert to kobo
+      metadata: {
+        userId: userId,
+        email: email,
+      }
+    };
+
     const response = await axios.post(
       "https://api.paystack.co/transaction/initialize",
-      {
-        email: "test@example.com",
-        amount: 5000,   // ₦50 test payment
-      },
+      payload,
       {
         headers: {
           Authorization: `Bearer ${process.env.PAYSTACK_SECRET_KEY}`,

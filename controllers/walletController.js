@@ -150,29 +150,79 @@ exports.initiateFund = async (req, res) => {
 exports.verifyFund = async (req, res) => {
   try {
     const reference = req.params.reference;
-    const resp = await axios.get(`${PAYSTACK_BASE}/transaction/verify/${encodeURIComponent(reference)}`, {
-      headers: { Authorization: `Bearer ${PAYSTACK_SECRET}` }
-    });
+
+    const resp = await axios.get(
+      `${PAYSTACK_BASE}/transaction/verify/${encodeURIComponent(reference)}`,
+      { headers: { Authorization: `Bearer ${PAYSTACK_SECRET}` } }
+    );
 
     await recordWalletTx(reference, { paystack_verify: resp.data });
 
+    // Paystack Transaction Status
     if (resp.data?.data?.status === 'success') {
+
+      // Amount Paystack reports (in Kobo)
       const amount_kobo = resp.data.data.amount;
-      const userId = resp.data.data.metadata?.userId || resp.data.data.customer?.email || null;
-      const meta = { paystack: resp.data.data };
+      const amount_naira = koboToNaira(amount_kobo);
 
-      const creditResult = await creditWalletIdempotent(userId, reference, amount_kobo, meta);
+      // userId from metadata
+      const userId = resp.data.data.metadata?.userId;
 
-      return res.json({ verified: true, creditResult, data: resp.data });
+      // --------- 👇 YOUR FEE LOGIC GOES HERE ---------
+
+      const paystackFee = amount_naira * 0.015;   // 1.5%
+      const myFee = amount_naira * 0.02;          // 2%
+
+      const totalFee = paystackFee + myFee;       // 3.5%
+
+      const finalCreditNaira = amount_naira - totalFee;
+
+      // Convert back to kobo safely:
+      const finalCreditKobo = nairaToKobo(finalCreditNaira);
+
+      // --------- END FEE LOGIC ---------
+
+      const meta = {
+        paystack: resp.data.data,
+        paystackFee,
+        myFee,
+        totalFee,
+        originalAmount: amount_naira,
+        creditedAmount: finalCreditNaira
+      };
+
+      // Credit the user's wallet with the new amount (AFTER fees)
+      const creditResult = await creditWalletIdempotent(
+        userId,
+        reference,
+        finalCreditKobo,
+        meta
+      );
+
+      return res.json({
+        verified: true,
+        status: true,
+        message: "Wallet funded successfully",
+        original_amount: amount_naira,
+        paystack_fee: Number(paystackFee.toFixed(2)),
+        my_fee: Number(myFee.toFixed(2)),
+        total_fee: Number(totalFee.toFixed(2)),
+        final_wallet_credit: finalCreditNaira,
+        creditResult,
+        data: resp.data
+      });
     }
 
-    return res.json({ verified: false, data: resp.data });
+    return res.json({ verified: false, status: false, data: resp.data });
+
   } catch (err) {
     console.error('verify error', err.response ? err.response.data : err.message);
-    return res.status(500).json({ status: false, error: err.response ? err.response.data : err.message });
+    return res.status(500).json({
+      status: false,
+      error: err.response ? err.response.data : err.message
+    });
   }
 };
-
 // POST /webhook (raw body) - Paystack webhook handling
 // inside controllers/walletController.js — replace webhookHandler with this
 // helper: find userId by DVA account number saved in wallets/{userId}.dva.account_number
