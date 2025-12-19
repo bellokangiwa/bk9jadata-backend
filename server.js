@@ -9,7 +9,13 @@ const cors = require("cors");
 const fs = require("fs");
 const path = require("path");
 
+const connectDB = require("./config/db");
 const app = express();
+
+// -----------------------------
+// 0. Connect MongoDB
+// -----------------------------
+connectDB();
 
 // -----------------------------
 // 1. Initialize Firebase

@@ -1,6 +1,5 @@
 const axios = require("axios");
 const admin = require("firebase-admin");
-const crypto = require("crypto");
 
 const db = admin.firestore();
 
@@ -30,16 +29,16 @@ async function recordWalletTx(txId, payload) {
   );
 }
 
-// ===== Idempotent Credit =====
+// ===== Idempotent Credit (FIXED) =====
 async function creditWalletIdempotent(userId, txId, amount_kobo, meta = {}) {
   const txRef = txCol().doc(txId);
-  const txSnap = await txRef.get();
-
-  if (txSnap.exists && txSnap.data().processed === true) {
-    return { processed: false, reason: "already_processed" };
-  }
 
   await db.runTransaction(async (t) => {
+    const txSnap = await t.get(txRef);
+    if (txSnap.exists && txSnap.data().processed === true) {
+      return;
+    }
+
     const walletRef = walletsCol().doc(userId);
     const walletSnap = await t.get(walletRef);
     const prev = walletSnap.exists ? walletSnap.data().balance || 0 : 0;
@@ -58,6 +57,7 @@ async function creditWalletIdempotent(userId, txId, amount_kobo, meta = {}) {
         amount_kobo,
         type: "credit",
         meta,
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
       },
       { merge: true }
     );
@@ -66,16 +66,16 @@ async function creditWalletIdempotent(userId, txId, amount_kobo, meta = {}) {
   return { processed: true };
 }
 
-// ===== Safe Debit =====
+// ===== Safe Debit (FIXED) =====
 async function debitWallet(userId, txId, amount_kobo, meta = {}) {
   const txRef = txCol().doc(txId);
-  const txSnap = await txRef.get();
 
-  if (txSnap.exists && txSnap.data().processed === true) {
-    return { success: false, reason: "already_processed" };
-  }
+  return await db.runTransaction(async (t) => {
+    const txSnap = await t.get(txRef);
+    if (txSnap.exists && txSnap.data().processed === true) {
+      return { success: false, reason: "already_processed" };
+    }
 
-  const result = await db.runTransaction(async (t) => {
     const walletRef = walletsCol().doc(userId);
     const walletSnap = await t.get(walletRef);
     const current = walletSnap.exists ? walletSnap.data().balance || 0 : 0;
@@ -94,17 +94,16 @@ async function debitWallet(userId, txId, amount_kobo, meta = {}) {
         amount_kobo,
         type: "debit",
         meta,
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
       },
       { merge: true }
     );
 
     return { success: true, remaining: current - amount_kobo };
   });
-
-  return result;
 }
 
-// ===== Controllers =====
+// ================= CONTROLLERS =================
 
 // GET /wallet/balance/:userId
 exports.getBalance = async (req, res) => {
@@ -168,60 +167,66 @@ exports.verifyFund = async (req, res) => {
   try {
     const reference = req.params.reference;
 
+    // 🔒 Prevent double verification
+    const txSnap = await txCol().doc(reference).get();
+    if (txSnap.exists && txSnap.data().processed === true) {
+      return res.json({
+        verified: true,
+        status: true,
+        message: "Already verified",
+      });
+    }
+
     const resp = await axios.get(
-      `${PAYSTACK_BASE}/transaction/verify/${reference}`,
+      `${PAYSTACK_BASE}/transaction/verify/${encodeURIComponent(reference)}`,
       { headers: { Authorization: `Bearer ${PAYSTACK_SECRET}` } }
     );
 
+    await recordWalletTx(reference, { paystack_verify: resp.data });
+
     if (resp.data?.data?.status !== "success") {
-      return res.json({ status: false, verified: false });
+      return res.json({ verified: false, status: false });
     }
 
-    const amount_kobo = resp.data.data.amount;
+    const amountKobo = resp.data.data.amount;
+    const amountNaira = koboToNaira(amountKobo);
+
     const userId = resp.data.data.metadata?.userId;
-
-    const credit = await creditWalletIdempotent(
-      userId,
-      reference,
-      amount_kobo,
-      { paystack: resp.data.data }
-    );
-
-    return res.json({
-      status: true,
-      verified: true,
-      credited_naira: koboToNaira(amount_kobo),
-      credit,
-    });
-  } catch (err) {
-    return res.status(500).json({ status: false, error: err.message });
-  }
-};
-
-// POST /wallet/debit
-exports.debit = async (req, res) => {
-  try {
-    const uid = req.auth?.uid;
-    if (!uid) return res.status(401).json({ error: "Not authenticated" });
-
-    const { amount, reason } = req.body;
-    if (!amount) return res.status(400).json({ error: "amount required" });
-
-    const amount_kobo = nairaToKobo(amount);
-    const txId = `DEBIT-${uid}-${Date.now()}`;
-
-    const result = await debitWallet(uid, txId, amount_kobo, { reason });
-
-    if (!result.success) {
-      return res.status(400).json(result);
+    if (!userId) {
+      return res.status(400).json({ status: false, error: "User not found in metadata" });
     }
 
+    // ===== FEES (SAFE ROUNDING) =====
+    const paystackFee = Math.round(amountNaira * 0.015 * 100) / 100;
+    const myFee = Math.round(amountNaira * 0.02 * 100) / 100;
+    const totalFee = paystackFee + myFee;
+
+    const finalCreditNaira = amountNaira - totalFee;
+    const finalCreditKobo = nairaToKobo(finalCreditNaira);
+
+    const meta = {
+      paystack: resp.data.data,
+      paystackFee,
+      myFee,
+      totalFee,
+      originalAmount: amountNaira,
+      creditedAmount: finalCreditNaira,
+      source: "verify_endpoint",
+    };
+
+    await creditWalletIdempotent(userId, reference, finalCreditKobo, meta);
+
     return res.json({
+      verified: true,
       status: true,
-      remaining_naira: koboToNaira(result.remaining),
+      message: "Wallet funded successfully",
+      final_wallet_credit: finalCreditNaira,
     });
   } catch (err) {
-    return res.status(500).json({ status: false, error: err.message });
+    return res.status(500).json({
+      status: false,
+      error: err.response?.data || err.message,
+    });
   }
 };
 
@@ -237,6 +242,46 @@ exports.history = async (req, res) => {
     const items = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
     return res.json({ status: true, items });
   } catch (err) {
+    return res.status(500).json({ status: false, error: err.message });
+  }
+};
+
+// POST /wallet/debit (protected)
+exports.debit = async (req, res) => {
+  try {
+    const uid = req.auth?.uid;
+    if (!uid) {
+      return res.status(401).json({ status: false, error: "Not authenticated" });
+    }
+
+    const { amount, reason } = req.body;
+    if (!amount) {
+      return res.status(400).json({ status: false, error: "amount required" });
+    }
+
+    const amount_kobo = nairaToKobo(amount);
+    const txId = `DEBIT-${uid}-${Date.now()}`;
+
+    const result = await debitWallet(uid, txId, amount_kobo, { reason });
+
+    if (!result.success) {
+      return res.status(400).json({
+        status: false,
+        reason: result.reason,
+        current_balance_kobo: result.current || 0,
+        current_balance_naira: koboToNaira(result.current || 0),
+      });
+    }
+
+    return res.json({
+      status: true,
+      message: "Wallet debited successfully",
+      remaining_kobo: result.remaining,
+      remaining_naira: koboToNaira(result.remaining),
+    });
+
+  } catch (err) {
+    console.error("debit error:", err.message);
     return res.status(500).json({ status: false, error: err.message });
   }
 };

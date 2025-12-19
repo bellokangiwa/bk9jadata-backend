@@ -1,109 +1,102 @@
 const axios = require("axios");
+const DataPlan = require("../models/DataPlan");
+const Transaction = require("../models/Transaction");
+const { debitWallet, creditWalletIdempotent } = require("./walletController");
 
-// ENV VARIABLES
-const USER_ID = process.env.CLUBKONNECT_USER_ID;
-const API_KEY = process.env.CLUBKONNECT_API_KEY;
-const AIRTIME_URL = process.env.CLUBKONNECT_AIRTIME_URL;
-const DATA_URL = process.env.CLUBKONNECT_DATA_URL;
-const DISCOUNT_URL = process.env.CLUBKONNECT_DISCOUNT_URL;
+const smeplugService = require("../services/smeplugService");
+const clubKonnectService = require("../services/clubKonnectService");
 
-// GENERATE UNIQUE REQUEST ID
+// ================= HELPERS =================
 function generateRequestID() {
   return "BK9JA_" + Date.now() + "_" + Math.floor(Math.random() * 10000);
 }
 
-// GET AIRTIME SERVICES (OPTIONAL)
-exports.getAirtimeServices = async (req, res) => {
-  try {
-    const url = `${DISCOUNT_URL}?UserID=${USER_ID}`;
-
-    const response = await axios.get(url);
-
-    res.json(response.data);
-  } catch (err) {
-    res.status(500).json({
-      error: err.response?.data || err.message,
-    });
-  }
-};
-
-// BUY AIRTIME
-exports.buyAirtime = async (req, res) => {
-  const { network, amount, phone } = req.body;
-
-  if (!network || !amount || !phone) {
-    return res.status(400).json({ error: "Missing required fields" });
-  }
-
-  const request_id = generateRequestID();
-
-  const url =
-    `${AIRTIME_URL}?UserID=${USER_ID}` +
-    `&APIKey=${API_KEY}` +
-    `&MobileNetwork=${network}` +     // 01 MTN, 02 GLO, 04 Airtel, 03 9mobile
-    `&Amount=${amount}` +
-    `&MobileNumber=${phone}` +
-    `&RequestID=${request_id}`;
-
-  try {
-    const response = await axios.get(url);
-
-    res.json({
-      request_id,
-      result: response.data,
-    });
-  } catch (err) {
-    res.status(500).json({
-      error: err.response?.data || err.message,
-    });
-  }
-};
-
-// BUY DATA
+// ================== BUY DATA ==================
 exports.buyData = async (req, res) => {
-  const { network, dataplan, phone } = req.body;
-
-  if (!network || !dataplan || !phone) {
-    return res.status(400).json({ error: "Missing required fields" });
-  }
-
-  const request_id = generateRequestID();
-
-  const url =
-    `${DATA_URL}?UserID=${USER_ID}` +
-    `&APIKey=${API_KEY}` +
-    `&MobileNetwork=${network}` +  // network code
-    `&DataPlan=${dataplan}` +      // exact plan code e.g. "500", "1GB", etc.
-    `&MobileNumber=${phone}` +
-    `&RequestID=${request_id}`;
-
   try {
-    const response = await axios.get(url);
+    const uid = req.auth?.uid;
+    if (!uid) return res.status(401).json({ error: "Not authenticated" });
 
-    res.json({
-      request_id,
-      result: response.data,
+    const { planId, phone } = req.body;
+    if (!planId || !phone)
+      return res.status(400).json({ error: "planId and phone are required" });
+
+    // 1️⃣ Fetch Data Plan
+    const plan = await DataPlan.findById(planId);
+    if (!plan || plan.status !== "active")
+      return res.status(404).json({ error: "Data plan not available" });
+
+    const requestId = generateRequestID();
+    const amountKobo = Math.round(plan.sellingPrice * 100);
+
+    // 2️⃣ Debit Wallet
+    const debitResult = await debitWallet(uid, requestId, amountKobo, {
+      purpose: "buy_data",
+      planId,
+    });
+    if (!debitResult.success)
+      return res.status(400).json({ error: "Insufficient wallet balance" });
+
+    // 3️⃣ Save Transaction (pending)
+    const tx = await Transaction.create({
+      userId: uid,
+      phone,
+      network: plan.network,
+      provider: plan.provider,
+      dataPlan: plan._id,
+      amount: plan.sellingPrice,
+      requestId,
+      status: "pending",
+    });
+
+    let providerResponse;
+
+    // 4️⃣ Call Provider
+    if (plan.provider === "CLUBKONNECT") {
+      providerResponse = await clubKonnectService.buyData({
+        network: plan.network,
+        dataplan: plan.dataValue,
+        phone,
+      });
+      if (providerResponse.error || providerResponse.result?.status !== "success")
+        throw new Error("ClubKonnect failed");
+    } else if (plan.provider === "SMEPLUG") {
+      providerResponse = await smeplugService.buyData({
+        network: plan.network,
+        plan_code: plan.apiCode,
+        phone,
+        request_id: requestId,
+      });
+      if (providerResponse.error || providerResponse.result?.status !== "success")
+        throw new Error("SMEPlug failed");
+    }
+
+    // 5️⃣ Update Transaction as success
+    tx.status = "success";
+    tx.providerResponse = providerResponse;
+    await tx.save();
+
+    return res.json({
+      status: true,
+      message: "Data purchase successful",
+      requestId,
     });
   } catch (err) {
-    res.status(500).json({
-      error: err.response?.data || err.message,
-    });
-  }
-};
+    console.error("Buy data failed:", err.message);
 
-// VERIFY (TRANSACTION STATUS)
-exports.verifyTransaction = async (req, res) => {
-  const { request_id } = req.params;
+    // 🔁 Refund wallet on failure
+    if (req.auth?.uid) {
+      await creditWalletIdempotent(
+        req.auth.uid,
+        "REFUND-" + Date.now(),
+        req.body?.amount ? Math.round(req.body.amount * 100) : 0,
+        { reason: "data_purchase_failed" }
+      );
+    }
 
-  const url = `https://www.nellobytesystems.com/APIQuery.asp?UserID=${USER_ID}&APIKey=${API_KEY}&RequestID=${request_id}`;
-
-  try {
-    const response = await axios.get(url);
-
-    res.json(response.data);
-  } catch (err) {
-    res.status(500).json({
-      error: err.response?.data || err.message,
+    return res.status(500).json({
+      status: false,
+      error: err.message || "Transaction failed",
     });
   }
 };
