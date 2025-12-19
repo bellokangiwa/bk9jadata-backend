@@ -4,7 +4,7 @@ const Transaction = require("../models/Transaction");
 const { debitWallet, creditWalletIdempotent } = require("./walletController");
 
 const smeplugService = require("../services/smeplugService");
-const clubKonnectService = require("../services/clubKonnectService");
+const clubKonnectService = require("../services/clubkonnectService");
 
 // ================= HELPERS =================
 function generateRequestID() {
