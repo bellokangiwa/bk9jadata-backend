@@ -66,7 +66,7 @@ async function creditWallet(userId, reference, amount_kobo, meta = {}) {
 }
 
 /**
- * POST /webhook/paystack
+ * POST /webhook
  * MUST use bodyParser.raw for Paystack signature verification
  */
 router.post("/", async (req, res) => {
@@ -91,14 +91,15 @@ router.post("/", async (req, res) => {
   }
 
   try {
+    // -----------------------------
+    // 1️⃣ Charge Success (normal checkout)
+    // -----------------------------
     if (event.event === "charge.success") {
       const reference = event.data.reference;
       const amount_kobo = event.data.amount;
 
-      // 1️⃣ Try metadata userId (Paystack checkout)
       let userId = event.data.metadata?.userId || null;
 
-      // 2️⃣ Fallback: DVA account number
       if (!userId) {
         const acct =
           event.data.authorization?.receiver_bank_account_number ||
@@ -120,12 +121,39 @@ router.post("/", async (req, res) => {
         channel: event.data.channel,
       });
 
-      console.log(
-        "✅ Webhook credited:",
-        userId,
-        "₦",
-        amount_kobo / 100
-      );
+      console.log("✅ Webhook credited:", userId, "₦", amount_kobo / 100);
+    }
+
+    // -----------------------------
+    // 2️⃣ Dedicated Virtual Account (DVA) payment
+    // -----------------------------
+    else if (event.event === "dedicated_account.transaction.success") {
+      const data = event.data;
+      const reference = data.reference;
+      const amount_kobo = data.amount;
+
+      const accountNumber =
+        data.dedicated_account?.account_number ||
+        data.authorization?.receiver_bank_account_number;
+
+      if (!accountNumber) {
+        console.warn("⚠️ No account number in DVA webhook");
+        return res.sendStatus(200);
+      }
+
+      const userId = await findUserIdByAccountNumber(accountNumber);
+
+      if (!userId) {
+        console.warn("⚠️ No wallet mapped to DVA:", accountNumber);
+        return res.sendStatus(200);
+      }
+
+      await creditWallet(userId, reference, amount_kobo, {
+        webhook: event,
+        channel: "DVA",
+      });
+
+      console.log("✅ DVA Wallet credited:", userId, "₦", amount_kobo / 100);
     }
   } catch (err) {
     console.error("🔥 Webhook processing error:", err.message);

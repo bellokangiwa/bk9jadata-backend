@@ -70,14 +70,12 @@ app.use((req, res, next) => {
 // -----------------------------
 const walletRoutes = require("./routes/walletRoutes");
 const vtuRoutes = require("./routes/vtuRoutes");
-const paystackRoutes = require("./routes/paystack");
 const dvaRoutes = require("./routes/dvaRoutes");
 
 // -----------------------------
 // 5. Mount routes
 // -----------------------------
 app.use("/api/vtu", vtuRoutes);
-app.use("/api/paystack", paystackRoutes);
 app.use("/api/dva", dvaRoutes);
 app.use("/api/wallet", walletRoutes);
 
