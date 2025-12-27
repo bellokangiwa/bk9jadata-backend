@@ -3,6 +3,7 @@ module.exports = [
   {
     network: "9MOBILE",
     provider: "SMEPLUG",
+    category: "CORPORATE",
     planType: "DAILY",
     name: "50MB Daily",
     apiCode: "187",
@@ -13,6 +14,7 @@ module.exports = [
   {
     network: "9MOBILE",
     provider: "SMEPLUG",
+    category: "CORPORATE",
     planType: "DAILY",
     name: "300MB Daily",
     apiCode: "186",
@@ -23,6 +25,7 @@ module.exports = [
   {
     network: "9MOBILE",
     provider: "SMEPLUG",
+    category: "CORPORATE",
     planType: "DAILY",
     name: "650MB Daily",
     apiCode: "195",
@@ -33,6 +36,7 @@ module.exports = [
   {
     network: "9MOBILE",
     provider: "SMEPLUG",
+    category: "CORPORATE",
     planType: "DAILY",
     name: "1GB Daily + Social",
     apiCode: "201",
@@ -45,6 +49,7 @@ module.exports = [
   {
     network: "9MOBILE",
     provider: "SMEPLUG",
+    category: "CORPORATE",
     planType: "WEEKLY",
     name: "250MB Weekly",
     apiCode: "207",
@@ -55,6 +60,7 @@ module.exports = [
   {
     network: "9MOBILE",
     provider: "SMEPLUG",
+    category: "CORPORATE",
     planType: "WEEKLY",
     name: "1GB Weekly + Social",
     apiCode: "202",
@@ -67,6 +73,7 @@ module.exports = [
   {
     network: "9MOBILE",
     provider: "SMEPLUG",
+    category: "CORPORATE",
     planType: "MONTHLY",
     name: "500MB Monthly",
     apiCode: "215",
@@ -77,6 +84,7 @@ module.exports = [
   {
     network: "9MOBILE",
     provider: "SMEPLUG",
+    category: "CORPORATE",
     planType: "MONTHLY",
     name: "1GB Monthly",
     apiCode: "181",
@@ -87,6 +95,7 @@ module.exports = [
   {
     network: "9MOBILE",
     provider: "SMEPLUG",
+    category: "CORPORATE",
     planType: "MONTHLY",
     name: "2GB (1GB + Night)",
     apiCode: "76",
@@ -97,6 +106,7 @@ module.exports = [
   {
     network: "9MOBILE",
     provider: "SMEPLUG",
+    category: "CORPORATE",
     planType: "MONTHLY",
     name: "4.2GB (2GB + Night)",
     apiCode: "78",
@@ -107,6 +117,7 @@ module.exports = [
   {
     network: "9MOBILE",
     provider: "SMEPLUG",
+    category: "CORPORATE",
     planType: "MONTHLY",
     name: "6.5GB (2.5GB + Night)",
     apiCode: "77",
@@ -117,6 +128,7 @@ module.exports = [
   {
     network: "9MOBILE",
     provider: "SMEPLUG",
+    category: "CORPORATE",
     planType: "MONTHLY",
     name: "12GB Monthly",
     apiCode: "198",
