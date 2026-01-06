@@ -47,12 +47,11 @@ try {
 // 2. Paystack Webhook (MUST be before express.json())
 // -----------------------------
 const webhook = require("./routes/webhook");
-app.post(
+app.use(
   "/webhook",
   bodyParser.raw({ type: "application/json" }),
   webhook
 );
-
 // -----------------------------
 // 3. Main middleware
 // -----------------------------
