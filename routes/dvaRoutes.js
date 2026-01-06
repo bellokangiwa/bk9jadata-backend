@@ -5,7 +5,10 @@ const admin = require("firebase-admin");
 const router = express.Router();
 const db = admin.firestore();
 
-// Utility: Safe split for full name
+/**
+ * Utility: Safe split for full name
+ * Paystack requires both first & last name
+ */
 function splitFullName(fullName) {
   if (!fullName || fullName.trim().length === 0) {
     return { firstName: "User", lastName: "User" };
@@ -16,7 +19,7 @@ function splitFullName(fullName) {
   if (parts.length === 1) {
     return {
       firstName: parts[0],
-      lastName: "User"    // fallback to avoid Paystack error
+      lastName: "User" // fallback to avoid Paystack error
     };
   }
 
@@ -26,9 +29,11 @@ function splitFullName(fullName) {
   };
 }
 
+/**
+ * CREATE / FETCH DEDICATED VIRTUAL ACCOUNT
+ */
 router.post("/create-dva", async (req, res) => {
   try {
-
     console.log("REQ BODY:", req.body);
 
     const { userId, name, email, phone } = req.body;
@@ -40,23 +45,35 @@ router.post("/create-dva", async (req, res) => {
       });
     }
 
+    const walletRef = db.collection("wallets").doc(userId);
+    const walletSnap = await walletRef.get();
+
+    /**
+     * 🔐 STEP 1: If DVA already exists → RETURN IT (no duplication)
+     */
+    if (walletSnap.exists && walletSnap.data()?.dva?.account_number) {
+      return res.json({
+        status: true,
+        message: "DVA already exists",
+        data: walletSnap.data().dva
+      });
+    }
+
     const { firstName, lastName } = splitFullName(name);
 
     let customer_code = null;
 
-    const walletRef = db.collection("wallets").doc(userId);
-    const walletSnap = await walletRef.get();
-
-    if (walletSnap.exists && walletSnap.data().customer_code) {
+    /**
+     * 🔐 STEP 2: Get or create Paystack customer
+     */
+    if (walletSnap.exists && walletSnap.data()?.customer_code) {
       customer_code = walletSnap.data().customer_code;
     } else {
-
-      // Normalize phone for Paystack
+      // Normalize Nigerian phone number
       const normalizedPhone = phone.startsWith("+234")
         ? phone
         : "+234" + phone.replace(/^0/, "");
 
-      // Create Paystack Customer
       const createCustomer = await axios.post(
         "https://api.paystack.co/customer",
         {
@@ -75,24 +92,28 @@ router.post("/create-dva", async (req, res) => {
 
       customer_code = createCustomer.data.data.customer_code;
 
-      await walletRef.set({ customer_code }, { merge: true });
+      // Save customer_code safely
+      await walletRef.set(
+        { customer_code },
+        { merge: true }
+      );
     }
 
-    // Create Dedicated Virtual Account
-    const dvaPayload = {
-      customer: customer_code,
-      preferred_bank: "wema-bank",
-      metadata: {
-        userId,
-        name,
-        phone,
-        purpose: "wallet_fund"
-      }
-    };
-
+    /**
+     * 🔐 STEP 3: Create Dedicated Virtual Account (DVA)
+     */
     const dvaResponse = await axios.post(
       "https://api.paystack.co/dedicated_account",
-      dvaPayload,
+      {
+        customer: customer_code,
+        preferred_bank: "wema-bank",
+        metadata: {
+          userId,
+          name,
+          phone,
+          purpose: "wallet_fund"
+        }
+      },
       {
         headers: {
           Authorization: `Bearer ${process.env.PAYSTACK_SECRET_KEY}`,
@@ -103,30 +124,31 @@ router.post("/create-dva", async (req, res) => {
 
     const dva = dvaResponse.data.data;
 
-    // Save DVA Details
+    /**
+     * 🔐 STEP 4: Save DVA details (NO STRUCTURE CHANGE)
+     */
     await walletRef.set(
-  {
-    dva: {
-      account_number: dva.account_number,
-      account_name: dva.account_name,          // ADD THIS
-      bank_name: dva.bank.name,
-      bank_id: dva.bank.id,
-      bank_slug: dva.bank.slug,                // ADD THIS
-      currency: dva.currency,                  // ADD THIS
-      active: dva.active,                      // ADD THIS
+      {
+        dva: {
+          account_number: dva.account_number,
+          account_name: dva.account_name,
+          bank_name: dva.bank.name,
+          bank_id: dva.bank.id,
+          bank_slug: dva.bank.slug,
+          currency: dva.currency,
+          active: dva.active,
 
-      paystack_dva_id: dva.id,
-      customer_id: dva.customer.id,
-      customer_code: dva.customer.customer_code,
+          paystack_dva_id: dva.id,
+          customer_id: dva.customer.id,
+          customer_code: dva.customer.customer_code,
 
-      assigned: dva.assigned,                  // ADD THIS
-      assigned_at: dva.assignment.assigned_at,
-      assignee_id: dva.assignment.assignee_id
-    }
-  },
-  { merge: true }
-);
-
+          assigned: dva.assigned,
+          assigned_at: dva.assignment.assigned_at,
+          assignee_id: dva.assignment.assignee_id
+        }
+      },
+      { merge: true }
+    );
 
     return res.json({
       status: true,

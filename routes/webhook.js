@@ -133,9 +133,11 @@ router.post("/", async (req, res) => {
       const amount_kobo = data.amount;
 
       const accountNumber =
-        data.dedicated_account?.account_number ||
-        data.authorization?.receiver_bank_account_number;
-
+  data.account_number ||
+  data.dedicated_account?.account_number ||
+  data.authorization?.receiver_bank_account_number ||
+  data.customer?.account_number;
+  
       if (!accountNumber) {
         console.warn("⚠️ No account number in DVA webhook");
         return res.sendStatus(200);
