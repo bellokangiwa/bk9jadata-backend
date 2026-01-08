@@ -9,10 +9,14 @@ const PAYSTACK_SECRET = process.env.PAYSTACK_SECRET_KEY;
 
 /**
  * Find wallet userId by DVA account number
- * Firestore structure stays the same
  */
 async function findUserIdByAccountNumber(accountNumber) {
-  if (!accountNumber) return null;
+  console.log("🔍 Searching wallet for account:", accountNumber);
+
+  if (!accountNumber) {
+    console.log("❌ accountNumber is empty");
+    return null;
+  }
 
   const snap = await db
     .collection("wallets")
@@ -20,29 +24,50 @@ async function findUserIdByAccountNumber(accountNumber) {
     .limit(1)
     .get();
 
-  if (snap.empty) return null;
-  return snap.docs[0].id;
+  if (snap.empty) {
+    console.log("❌ No wallet matched account:", accountNumber);
+    return null;
+  }
+
+  const userId = snap.docs[0].id;
+  console.log("✅ Wallet found, userId:", userId);
+  return userId;
 }
 
 /**
  * Credit wallet safely (idempotent)
- * Uses kobo
  */
 async function creditWallet(userId, reference, amount_kobo, meta = {}) {
+  console.log("💰 Crediting wallet:", {
+    userId,
+    reference,
+    amount_kobo,
+  });
+
   const txRef = db.collection("wallet_transactions").doc(reference);
 
   await db.runTransaction(async (t) => {
     const txSnap = await t.get(txRef);
-    if (txSnap.exists && txSnap.data().processed === true) return;
+
+    if (txSnap.exists && txSnap.data().processed === true) {
+      console.log("🔁 Duplicate webhook ignored:", reference);
+      return;
+    }
 
     const walletRef = db.collection("wallets").doc(userId);
     const walletSnap = await t.get(walletRef);
-    const prev = walletSnap.exists ? walletSnap.data().balance || 0 : 0;
+
+    const prevBalance = walletSnap.exists
+      ? walletSnap.data().balance || 0
+      : 0;
+
+    console.log("📊 Previous balance:", prevBalance);
 
     if (!walletSnap.exists) {
-      t.set(walletRef, { balance: prev + amount_kobo });
+      console.log("⚠️ Wallet doc missing, creating new");
+      t.set(walletRef, { balance: prevBalance + amount_kobo });
     } else {
-      t.update(walletRef, { balance: prev + amount_kobo });
+      t.update(walletRef, { balance: prevBalance + amount_kobo });
     }
 
     t.set(
@@ -58,16 +83,27 @@ async function creditWallet(userId, reference, amount_kobo, meta = {}) {
       },
       { merge: true }
     );
+
+    console.log(
+      "✅ Wallet credited. New balance:",
+      prevBalance + amount_kobo
+    );
   });
 }
 
 /**
- * Paystack Webhook
- * MUST use bodyParser.raw
+ * PAYSTACK WEBHOOK
  */
 router.post("/", async (req, res) => {
+  console.log("🔔 WEBHOOK HIT");
+
   const signature = req.headers["x-paystack-signature"];
   const rawBody = req.body;
+
+  if (!signature) {
+    console.log("❌ Missing Paystack signature");
+    return res.sendStatus(400);
+  }
 
   const hash = crypto
     .createHmac("sha512", PAYSTACK_SECRET)
@@ -75,50 +111,52 @@ router.post("/", async (req, res) => {
     .digest("hex");
 
   if (hash !== signature) {
-    console.log("❌ Invalid signature");
+    console.log("❌ Invalid Paystack signature");
     return res.sendStatus(400);
   }
+
+  console.log("✅ Signature verified");
 
   let event;
   try {
     event = JSON.parse(rawBody.toString());
-  } catch {
+  } catch (err) {
+    console.log("❌ JSON parse error");
     return res.sendStatus(400);
   }
+
+  console.log("📦 Event received:", event.event);
 
   try {
     /**
      * ===============================
-     * DVA PAYMENT (THIS IS YOUR CASE)
+     * DVA PAYMENT
      * ===============================
      */
     if (event.event === "dedicated_account.transaction.success") {
-      const data = event.data;
+      console.log("🏦 DVA transaction detected");
 
+      const data = event.data;
       const reference = data.reference;
       const amount_kobo = data.amount;
 
-      /**
-       * 🔑 PAYSTACK REALITY:
-       * Account number can come from ANY of these
-       */
       const accountNumber =
         data.account_number ||
         data.dedicated_account?.account_number ||
         data.customer?.account_number ||
         data.metadata?.account_number;
 
-      console.log("💡 DVA ACCOUNT:", accountNumber);
+      console.log("🏦 Account number found:", accountNumber);
 
       if (!accountNumber) {
-        console.log("⚠️ Account number missing in webhook");
+        console.log("❌ No account number in webhook payload");
         return res.sendStatus(200);
       }
 
       const userId = await findUserIdByAccountNumber(accountNumber);
 
       if (!userId) {
-        console.log("⚠️ No wallet found for:", accountNumber);
+        console.log("❌ Wallet not found for account:", accountNumber);
         return res.sendStatus(200);
       }
 
@@ -127,31 +165,37 @@ router.post("/", async (req, res) => {
         paystack_event: event,
       });
 
-      console.log("✅ DVA wallet credited:", userId, amount_kobo / 100);
+      console.log("🎉 DVA WALLET CREDITED SUCCESSFULLY");
     }
 
     /**
      * ===============================
-     * NORMAL PAYSTACK CHECKOUT
+     * NORMAL CHECKOUT
      * ===============================
      */
-    if (event.event === "charge.success") {
+    else if (event.event === "charge.success") {
+      console.log("💳 Checkout transaction detected");
+
       const reference = event.data.reference;
       const amount_kobo = event.data.amount;
-
       const userId = event.data.metadata?.userId;
-      if (!userId) return res.sendStatus(200);
+
+      if (!userId) {
+        console.log("❌ userId missing in metadata");
+        return res.sendStatus(200);
+      }
 
       await creditWallet(userId, reference, amount_kobo, {
         channel: event.data.channel,
         paystack_event: event,
       });
 
-      console.log("✅ Checkout wallet credited:", userId);
+      console.log("🎉 CHECKOUT WALLET CREDITED");
+    } else {
+      console.log("ℹ️ Event ignored:", event.event);
     }
-
   } catch (err) {
-    console.error("🔥 Webhook error:", err.message);
+    console.error("🔥 Webhook processing error:", err);
   }
 
   return res.sendStatus(200);
