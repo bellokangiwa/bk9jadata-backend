@@ -100,18 +100,13 @@ router.post("/", async (req, res) => {
   const signature = req.headers["x-paystack-signature"];
   const rawBody = req.body;
 
-  if (!signature) {
-    console.log("❌ Missing Paystack signature");
-    return res.sendStatus(400);
-  }
-
   const hash = crypto
     .createHmac("sha512", PAYSTACK_SECRET)
     .update(rawBody)
     .digest("hex");
 
   if (hash !== signature) {
-    console.log("❌ Invalid Paystack signature");
+    console.log("❌ Invalid signature");
     return res.sendStatus(400);
   }
 
@@ -120,43 +115,44 @@ router.post("/", async (req, res) => {
   let event;
   try {
     event = JSON.parse(rawBody.toString());
-  } catch (err) {
-    console.log("❌ JSON parse error");
+  } catch {
     return res.sendStatus(400);
   }
 
   console.log("📦 Event received:", event.event);
 
   try {
+
     /**
      * ===============================
-     * DVA PAYMENT
+     * 1️⃣ DVA FUNDING (YOUR MAIN CASE)
      * ===============================
      */
-    if (event.event === "dedicated_account.transaction.success") {
+    if (
+      event.event === "charge.success" &&
+      event.data.channel === "dedicated_nuban"
+    ) {
       console.log("🏦 DVA transaction detected");
 
-      const data = event.data;
-      const reference = data.reference;
-      const amount_kobo = data.amount;
+      const amount_kobo = event.data.amount;
+      const reference = event.data.reference;
 
+      // Paystack sends account number here
       const accountNumber =
-        data.account_number ||
-        data.dedicated_account?.account_number ||
-        data.customer?.account_number ||
-        data.metadata?.account_number;
+        event.data.authorization?.receiver_bank_account_number ||
+        event.data.authorization?.account_number;
 
-      console.log("🏦 Account number found:", accountNumber);
+      console.log("💡 Account number:", accountNumber);
 
       if (!accountNumber) {
-        console.log("❌ No account number in webhook payload");
+        console.log("❌ No account number found");
         return res.sendStatus(200);
       }
 
       const userId = await findUserIdByAccountNumber(accountNumber);
 
       if (!userId) {
-        console.log("❌ Wallet not found for account:", accountNumber);
+        console.log("❌ No wallet mapped to account:", accountNumber);
         return res.sendStatus(200);
       }
 
@@ -165,12 +161,12 @@ router.post("/", async (req, res) => {
         paystack_event: event,
       });
 
-      console.log("🎉 DVA WALLET CREDITED SUCCESSFULLY");
+      console.log("✅ DVA wallet credited:", userId);
     }
 
     /**
      * ===============================
-     * NORMAL CHECKOUT
+     * 2️⃣ NORMAL CHECKOUT FUNDING
      * ===============================
      */
     else if (event.event === "charge.success") {
@@ -178,6 +174,7 @@ router.post("/", async (req, res) => {
 
       const reference = event.data.reference;
       const amount_kobo = event.data.amount;
+
       const userId = event.data.metadata?.userId;
 
       if (!userId) {
@@ -190,15 +187,12 @@ router.post("/", async (req, res) => {
         paystack_event: event,
       });
 
-      console.log("🎉 CHECKOUT WALLET CREDITED");
-    } else {
-      console.log("ℹ️ Event ignored:", event.event);
+      console.log("✅ Checkout wallet credited:", userId);
     }
+
   } catch (err) {
-    console.error("🔥 Webhook processing error:", err);
+    console.error("🔥 Webhook processing error:", err.message);
   }
 
   return res.sendStatus(200);
 });
-
-module.exports = router;
