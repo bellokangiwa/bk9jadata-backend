@@ -1,6 +1,6 @@
 const axios = require("axios");
 const admin = require("firebase-admin");
-
+const { calculateFees, nairaToKobo, koboToNaira } = require("../utils/fees");
 const db = admin.firestore();
 
 // ===== Environment =====
@@ -13,12 +13,6 @@ const walletsCol = () => db.collection("wallets");
 const txCol = () => db.collection("wallet_transactions");
 
 // ===== Helpers =====
-function nairaToKobo(naira) {
-  return Math.round(Number(naira) * 100);
-}
-function koboToNaira(kobo) {
-  return Number(kobo) / 100;
-}
 async function recordWalletTx(txId, payload) {
   return txCol().doc(txId).set(
     {
@@ -189,39 +183,39 @@ exports.verifyFund = async (req, res) => {
     }
 
     const amountKobo = resp.data.data.amount;
-    const amountNaira = koboToNaira(amountKobo);
-
     const userId = resp.data.data.metadata?.userId;
     if (!userId) {
       return res.status(400).json({ status: false, error: "User not found in metadata" });
     }
 
     // ===== FEES (SAFE ROUNDING) =====
-    const paystackFee = Math.round(amountNaira * 0.015 * 100) / 100;
-    const myFee = Math.round(amountNaira * 0.02 * 100) / 100;
-    const totalFee = paystackFee + myFee;
+   const fees = calculateFees(amountKobo);
 
-    const finalCreditNaira = amountNaira - totalFee;
-    const finalCreditKobo = nairaToKobo(finalCreditNaira);
+const meta = {
+  paystack: resp.data.data,
+  original_amount_kobo: fees.original_kobo,
+  credited_amount_kobo: fees.credited_kobo,
+  paystack_fee_kobo: fees.paystack_fee_kobo,
+  my_fee_kobo: fees.my_fee_kobo,
+  total_fee_kobo: fees.total_fee_kobo,
+  source: "verify_endpoint",
+};
 
-    const meta = {
-      paystack: resp.data.data,
-      paystackFee,
-      myFee,
-      totalFee,
-      originalAmount: amountNaira,
-      creditedAmount: finalCreditNaira,
-      source: "verify_endpoint",
-    };
+await creditWalletIdempotent(
+  userId,
+  reference,
+  fees.credited_kobo,
+  meta
+);
 
-    await creditWalletIdempotent(userId, reference, finalCreditKobo, meta);
+const finalCreditNaira = koboToNaira(fees.credited_kobo);
 
-    return res.json({
-      verified: true,
-      status: true,
-      message: "Wallet funded successfully",
-      final_wallet_credit: finalCreditNaira,
-    });
+return res.json({
+  verified: true,
+  status: true,
+  message: "Wallet funded successfully",
+  final_wallet_credit: finalCreditNaira,
+});
   } catch (err) {
     return res.status(500).json({
       status: false,

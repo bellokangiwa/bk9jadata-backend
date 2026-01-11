@@ -1,7 +1,7 @@
 const express = require("express");
 const crypto = require("crypto");
 const admin = require("firebase-admin");
-
+const { calculateFees } = require("../utils/fees");
 const router = express.Router();
 const db = admin.firestore();
 
@@ -156,11 +156,17 @@ router.post("/", async (req, res) => {
         return res.sendStatus(200);
       }
 
-      await creditWallet(userId, reference, amount_kobo, {
-        channel: "DVA",
-        paystack_event: event,
-      });
+  const fees = calculateFees(amount_kobo);
 
+await creditWallet(userId, reference, fees.credited_kobo, {
+  channel: "DVA",
+  original_amount_kobo: fees.original_kobo,
+  credited_amount_kobo: fees.credited_kobo,
+  paystack_fee_kobo: fees.paystack_fee_kobo,
+  my_fee_kobo: fees.my_fee_kobo,
+  total_fee_kobo: fees.total_fee_kobo,
+  paystack_event: event,
+});
       console.log("✅ DVA wallet credited:", userId);
     }
 
@@ -182,11 +188,17 @@ router.post("/", async (req, res) => {
         return res.sendStatus(200);
       }
 
-      await creditWallet(userId, reference, amount_kobo, {
-        channel: event.data.channel,
-        paystack_event: event,
-      });
+      const fees = calculateFees(amount_kobo);
 
+await creditWallet(userId, reference, fees.credited_kobo, {
+  channel: event.data.channel,
+  original_amount_kobo: fees.original_kobo,
+  credited_amount_kobo: fees.credited_kobo,
+  paystack_fee_kobo: fees.paystack_fee_kobo,
+  my_fee_kobo: fees.my_fee_kobo,
+  total_fee_kobo: fees.total_fee_kobo,
+  paystack_event: event,
+});
       console.log("✅ Checkout wallet credited:", userId);
     }
 
