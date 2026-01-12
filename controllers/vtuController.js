@@ -25,9 +25,8 @@ exports.getAirtimeServices = async (req, res) => {
 // ================== BUY AIRTIME ==================
 exports.buyAirtime = async (req, res) => {
   try {
-    const uid = req.auth?.uid;
-    if (!uid) return res.status(401).json({ error: "Not authenticated" });
-
+    // Get userId from request body (or use a default test ID)
+const uid = req.body.userId || "test_user";
     const { network, amount, phone } = req.body;
     if (!network || !amount || !phone) return res.status(400).json({ error: "Missing required fields" });
 
@@ -119,9 +118,9 @@ exports.buyData = async (req, res) => {
   } catch (err) {
     console.error("Buy data failed:", err.message);
 
-    if (req.auth?.uid) {
-      await creditWalletIdempotent(req.auth.uid, "REFUND-" + Date.now(), req.body?.amount ? Math.round(req.body.amount * 100) : 0, { reason: "data_purchase_failed" });
-    }
+    if (uid) {
+  await creditWalletIdempotent(uid, "REFUND-" + Date.now(), req.body?.amount ? Math.round(req.body.amount * 100) : 0, { reason: "data_purchase_failed" });
+}
 
     res.status(500).json({ status: false, error: err.message || "Transaction failed" });
   }
