@@ -7,6 +7,7 @@ const smeplugService = require("../services/smeplugService");
 const clubKonnectService = require("../services/clubkonnectService");
 
 // ================= HELPERS =================
+// Generates a unique request ID for each transaction
 function generateRequestID() {
   return "BK9JA_" + Date.now() + "_" + Math.floor(Math.random() * 10000);
 }
@@ -14,8 +15,10 @@ function generateRequestID() {
 // ================== GET AIRTIME SERVICES ==================
 exports.getAirtimeServices = async (req, res) => {
   try {
-    // Example: you can fetch airtime services from ClubKonnect
-    const response = await axios.get(`${process.env.CLUBKONNECT_DISCOUNT_URL}?UserID=${process.env.CLUBKONNECT_USER_ID}`);
+    // Fetch airtime services from ClubKonnect API
+    const response = await axios.get(
+      `${process.env.CLUBKONNECT_DISCOUNT_URL}?UserID=${process.env.CLUBKONNECT_USER_ID}`
+    );
     res.json(response.data);
   } catch (err) {
     res.status(500).json({ error: err.response?.data || err.message });
@@ -25,29 +28,35 @@ exports.getAirtimeServices = async (req, res) => {
 // ================== BUY AIRTIME ==================
 exports.buyAirtime = async (req, res) => {
   try {
-    // Get userId from request body (or use a default test ID)
-const uid = req.body.userId || "test_user";
+    // Since Firebase Auth is removed, use userId from request body
+    const uid = req.body.userId || "test_user";
+
     const { network, amount, phone } = req.body;
-    if (!network || !amount || !phone) return res.status(400).json({ error: "Missing required fields" });
+    if (!network || !amount || !phone) {
+      return res.status(400).json({ error: "Missing required fields" });
+    }
 
     const requestId = generateRequestID();
-    const amountKobo = Math.round(amount * 100);
+    const amountKobo = Math.round(amount * 100); // Convert Naira to Kobo
 
     // Debit wallet
-    const debitResult = await debitWallet(uid, requestId, amountKobo, { purpose: "buy_airtime" });
-    if (!debitResult.success) return res.status(400).json({ error: "Insufficient wallet balance" });
+    const debitResult = await debitWallet(uid, requestId, amountKobo, {
+      purpose: "buy_airtime",
+    });
+    if (!debitResult.success)
+      return res.status(400).json({ error: "Insufficient wallet balance" });
 
     // Call ClubKonnect Airtime API
     const providerResponse = await axios.get(
       `${process.env.CLUBKONNECT_AIRTIME_URL}?UserID=${process.env.CLUBKONNECT_USER_ID}` +
-      `&APIKey=${process.env.CLUBKONNECT_API_KEY}` +
-      `&MobileNetwork=${network}` +
-      `&Amount=${amount}` +
-      `&MobileNumber=${phone}` +
-      `&RequestID=${requestId}`
+        `&APIKey=${process.env.CLUBKONNECT_API_KEY}` +
+        `&MobileNetwork=${network}` +
+        `&Amount=${amount}` +
+        `&MobileNumber=${phone}` +
+        `&RequestID=${requestId}`
     );
 
-    // Save transaction in DB
+    // Save transaction in Firestore
     await Transaction.create({
       userId: uid,
       phone,
@@ -59,9 +68,11 @@ const uid = req.body.userId || "test_user";
       providerResponse: providerResponse.data,
     });
 
-    // If failed, refund wallet
+    // If transaction failed, refund wallet
     if (providerResponse.data?.status !== "success") {
-      await creditWalletIdempotent(uid, "REFUND-" + Date.now(), amountKobo, { reason: "airtime_failed" });
+      await creditWalletIdempotent(uid, "REFUND-" + Date.now(), amountKobo, {
+        reason: "airtime_failed",
+      });
       throw new Error("Airtime purchase failed");
     }
 
@@ -75,21 +86,32 @@ const uid = req.body.userId || "test_user";
 // ================== BUY DATA ==================
 exports.buyData = async (req, res) => {
   try {
-    const uid = req.auth?.uid;
-    if (!uid) return res.status(401).json({ error: "Not authenticated" });
+    // Use userId from request body since Firebase Auth is removed
+    const uid = req.body.userId || "test_user";
 
     const { planId, phone } = req.body;
-    if (!planId || !phone) return res.status(400).json({ error: "planId and phone are required" });
+    if (!planId || !phone) {
+      return res.status(400).json({ error: "planId and phone are required" });
+    }
 
+    // Find the data plan in Firestore
     const plan = await DataPlan.findById(planId);
-    if (!plan || plan.status !== "active") return res.status(404).json({ error: "Data plan not available" });
+    if (!plan || plan.status !== "active") {
+      return res.status(404).json({ error: "Data plan not available" });
+    }
 
     const requestId = generateRequestID();
     const amountKobo = Math.round(plan.sellingPrice * 100);
 
-    const debitResult = await debitWallet(uid, requestId, amountKobo, { purpose: "buy_data", planId });
-    if (!debitResult.success) return res.status(400).json({ error: "Insufficient wallet balance" });
+    // Debit wallet
+    const debitResult = await debitWallet(uid, requestId, amountKobo, {
+      purpose: "buy_data",
+      planId,
+    });
+    if (!debitResult.success)
+      return res.status(400).json({ error: "Insufficient wallet balance" });
 
+    // Create a transaction in Firestore
     const tx = await Transaction.create({
       userId: uid,
       phone,
@@ -101,15 +123,28 @@ exports.buyData = async (req, res) => {
       status: "pending",
     });
 
+    // Call the correct provider API
     let providerResponse;
     if (plan.provider === "CLUBKONNECT") {
-      providerResponse = await clubKonnectService.buyData({ network: plan.network, dataplan: plan.dataValue, phone });
-      if (providerResponse.error || providerResponse.result?.status !== "success") throw new Error("ClubKonnect failed");
+      providerResponse = await clubKonnectService.buyData({
+        network: plan.network,
+        dataplan: plan.dataValue,
+        phone,
+      });
+      if (providerResponse.error || providerResponse.result?.status !== "success")
+        throw new Error("ClubKonnect failed");
     } else if (plan.provider === "SMEPLUG") {
-      providerResponse = await smeplugService.buyData({ network: plan.network, plan_code: plan.apiCode, phone, request_id: requestId });
-      if (providerResponse.error || providerResponse.result?.status !== "success") throw new Error("SMEPlug failed");
+      providerResponse = await smeplugService.buyData({
+        network: plan.network,
+        plan_code: plan.apiCode,
+        phone,
+        request_id: requestId,
+      });
+      if (providerResponse.error || providerResponse.result?.status !== "success")
+        throw new Error("SMEPlug failed");
     }
 
+    // Update transaction status
     tx.status = "success";
     tx.providerResponse = providerResponse;
     await tx.save();
@@ -118,9 +153,14 @@ exports.buyData = async (req, res) => {
   } catch (err) {
     console.error("Buy data failed:", err.message);
 
-    if (uid) {
-  await creditWalletIdempotent(uid, "REFUND-" + Date.now(), req.body?.amount ? Math.round(req.body.amount * 100) : 0, { reason: "data_purchase_failed" });
-}
+    // Refund wallet if debit already happened
+    const uid = req.body.userId || "test_user";
+    await creditWalletIdempotent(
+      uid,
+      "REFUND-" + Date.now(),
+      req.body?.amount ? Math.round(req.body.amount * 100) : 0,
+      { reason: "data_purchase_failed" }
+    );
 
     res.status(500).json({ status: false, error: err.message || "Transaction failed" });
   }
