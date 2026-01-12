@@ -23,7 +23,7 @@ async function recordWalletTx(txId, payload) {
   );
 }
 
-// ===== Idempotent Credit (FIXED) =====
+// ===== Idempotent Credit =====
 async function creditWalletIdempotent(userId, txId, amount_kobo, meta = {}) {
   const txRef = txCol().doc(txId);
 
@@ -60,7 +60,7 @@ async function creditWalletIdempotent(userId, txId, amount_kobo, meta = {}) {
   return { processed: true };
 }
 
-// ===== Safe Debit (FIXED) =====
+// ===== Safe Debit =====
 async function debitWallet(userId, txId, amount_kobo, meta = {}) {
   const txRef = txCol().doc(txId);
 
@@ -161,7 +161,6 @@ exports.verifyFund = async (req, res) => {
   try {
     const reference = req.params.reference;
 
-    // 🔒 Prevent double verification
     const txSnap = await txCol().doc(reference).get();
     if (txSnap.exists && txSnap.data().processed === true) {
       return res.json({
@@ -188,39 +187,29 @@ exports.verifyFund = async (req, res) => {
       return res.status(400).json({ status: false, error: "User not found in metadata" });
     }
 
-    // ===== FEES (SAFE ROUNDING) =====
-   const fees = calculateFees(amountKobo);
+    const fees = calculateFees(amountKobo);
+    const meta = {
+      paystack: resp.data.data,
+      original_amount_kobo: fees.original_kobo,
+      credited_amount_kobo: fees.credited_kobo,
+      paystack_fee_kobo: fees.paystack_fee_kobo,
+      my_fee_kobo: fees.my_fee_kobo,
+      total_fee_kobo: fees.total_fee_kobo,
+      source: "verify_endpoint",
+    };
 
-const meta = {
-  paystack: resp.data.data,
-  original_amount_kobo: fees.original_kobo,
-  credited_amount_kobo: fees.credited_kobo,
-  paystack_fee_kobo: fees.paystack_fee_kobo,
-  my_fee_kobo: fees.my_fee_kobo,
-  total_fee_kobo: fees.total_fee_kobo,
-  source: "verify_endpoint",
-};
+    await creditWalletIdempotent(userId, reference, fees.credited_kobo, meta);
 
-await creditWalletIdempotent(
-  userId,
-  reference,
-  fees.credited_kobo,
-  meta
-);
+    const finalCreditNaira = koboToNaira(fees.credited_kobo);
 
-const finalCreditNaira = koboToNaira(fees.credited_kobo);
-
-return res.json({
-  verified: true,
-  status: true,
-  message: "Wallet funded successfully",
-  final_wallet_credit: finalCreditNaira,
-});
-  } catch (err) {
-    return res.status(500).json({
-      status: false,
-      error: err.response?.data || err.message,
+    return res.json({
+      verified: true,
+      status: true,
+      message: "Wallet funded successfully",
+      final_wallet_credit: finalCreditNaira,
     });
+  } catch (err) {
+    return res.status(500).json({ status: false, error: err.response?.data || err.message });
   }
 };
 
@@ -240,18 +229,14 @@ exports.history = async (req, res) => {
   }
 };
 
-// POST /wallet/debit (protected)
+// POST /wallet/debit
 exports.debit = async (req, res) => {
   try {
     const uid = req.auth?.uid;
-    if (!uid) {
-      return res.status(401).json({ status: false, error: "Not authenticated" });
-    }
+    if (!uid) return res.status(401).json({ status: false, error: "Not authenticated" });
 
     const { amount, reason } = req.body;
-    if (!amount) {
-      return res.status(400).json({ status: false, error: "amount required" });
-    }
+    if (!amount) return res.status(400).json({ status: false, error: "amount required" });
 
     const amount_kobo = nairaToKobo(amount);
     const txId = `DEBIT-${uid}-${Date.now()}`;
@@ -273,9 +258,12 @@ exports.debit = async (req, res) => {
       remaining_kobo: result.remaining,
       remaining_naira: koboToNaira(result.remaining),
     });
-
   } catch (err) {
     console.error("debit error:", err.message);
     return res.status(500).json({ status: false, error: err.message });
   }
 };
+
+// ===== EXPORT HELPERS FOR OTHER CONTROLLERS =====
+exports.debitWallet = debitWallet;
+exports.creditWalletIdempotent = creditWalletIdempotent;
