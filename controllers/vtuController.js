@@ -28,8 +28,9 @@ exports.getAirtimeServices = async (req, res) => {
 // ================== BUY AIRTIME ==================
 exports.buyAirtime = async (req, res) => {
   try {
-    // 🔐 UID comes from Firebase middleware
-    const uid = req.auth.uid;
+    // Use Firebase UID from middleware
+    const uid = req.auth?.uid;
+    if (!uid) return res.status(401).json({ error: "Unauthorized" });
 
     const { network, amount, phone } = req.body;
     if (!network || !amount || !phone) {
@@ -37,9 +38,9 @@ exports.buyAirtime = async (req, res) => {
     }
 
     const requestId = generateRequestID();
-    const amountKobo = Math.round(amount * 100);
+    const amountKobo = Math.round(amount * 100); // Convert Naira to Kobo
 
-    // Debit wallet
+    // ✅ Only debit wallet after validation
     const debitResult = await debitWallet(uid, requestId, amountKobo, {
       purpose: "buy_airtime",
     });
@@ -48,16 +49,17 @@ exports.buyAirtime = async (req, res) => {
       return res.status(400).json({ error: "Insufficient wallet balance" });
     }
 
-    // Call provider
+    // Call ClubKonnect Airtime API
     const providerResponse = await axios.get(
       `${process.env.CLUBKONNECT_AIRTIME_URL}?UserID=${process.env.CLUBKONNECT_USER_ID}` +
-      `&APIKey=${process.env.CLUBKONNECT_API_KEY}` +
-      `&MobileNetwork=${network}` +
-      `&Amount=${amount}` +
-      `&MobileNumber=${phone}` +
-      `&RequestID=${requestId}`
+        `&APIKey=${process.env.CLUBKONNECT_API_KEY}` +
+        `&MobileNetwork=${network}` +
+        `&Amount=${amount}` +
+        `&MobileNumber=${phone}` +
+        `&RequestID=${requestId}`
     );
 
+    // Save transaction
     await Transaction.create({
       userId: uid,
       phone,
@@ -69,17 +71,18 @@ exports.buyAirtime = async (req, res) => {
       providerResponse: providerResponse.data,
     });
 
+    // Refund if failed
     if (providerResponse.data?.status !== "success") {
       await creditWalletIdempotent(uid, "REFUND-" + Date.now(), amountKobo, {
         reason: "airtime_failed",
       });
-      throw new Error("Airtime purchase failed");
+      return res.status(500).json({ error: "Airtime purchase failed" });
     }
 
     res.json({ status: true, message: "Airtime purchase successful", requestId });
   } catch (err) {
     console.error("Buy airtime failed:", err.message);
-    res.status(500).json({ status: false, error: err.message });
+    res.status(500).json({ status: false, error: err.message || "Transaction failed" });
   }
 };
 // ================== BUY DATA ==================
