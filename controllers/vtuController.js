@@ -221,3 +221,27 @@ exports.buyData = async (req, res) => {
     });
   }
 };
+// ================== VERIFY TRANSACTION ==================
+exports.verifyTransaction = async (req, res) => {
+  try {
+    const { request_id } = req.params;
+
+    const response = await axios.get(
+      "https://www.nellobytesystems.com/APIQuery.asp",
+      {
+        params: {
+          UserID: process.env.CLUBKONNECT_USER_ID,
+          APIKey: process.env.CLUBKONNECT_API_KEY,
+          RequestID: request_id,
+        },
+      }
+    );
+
+    return res.json(response.data);
+  } catch (err) {
+    return res.status(500).json({
+      status: false,
+      error: err.response?.data || err.message,
+    });
+  }
+};
