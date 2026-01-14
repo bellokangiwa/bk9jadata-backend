@@ -29,13 +29,12 @@ const transactionSchema = new mongoose.Schema(
       required: true,
     },
 
-    // Data plan reference
-    dataPlan: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "DataPlan",
-      required: true,
-    },
-
+    // Data plan reference (optional for airtime)
+dataPlan: {
+  type: mongoose.Schema.Types.ObjectId,
+  ref: "DataPlan",
+  required: false, // now optional
+},
     // Amount charged to user (selling price)
     amount: {
       type: Number,
