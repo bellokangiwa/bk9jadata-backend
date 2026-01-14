@@ -2,7 +2,7 @@ const axios = require("axios");
 const DataPlan = require("../models/DataPlan");
 const Transaction = require("../models/Transaction");
 const { debitWallet, creditWalletIdempotent } = require("./walletController");
-
+const { clubKonnectNetworkMap } = require("../utils/networkMapper");
 const smeplugService = require("../services/smeplugService");
 const clubKonnectService = require("../services/clubkonnectService");
 
@@ -29,38 +29,75 @@ exports.getAirtimeServices = async (req, res) => {
 exports.buyAirtime = async (req, res) => {
   try {
     const uid = req.auth?.uid;
-    if (!uid) return res.status(401).json({ error: "Unauthorized" });
+    if (!uid) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
 
     const { network, amount, phone } = req.body;
     if (!network || !amount || !phone) {
       return res.status(400).json({ error: "Missing required fields" });
     }
 
+    // ✅ Convert network to ClubKonnect code
+    const providerNetwork = clubKonnectNetworkMap[network];
+    if (!providerNetwork) {
+      return res.status(400).json({
+        error: "Invalid network",
+        allowed: ["MTN", "GLO", "AIRTEL", "9MOBILE"],
+      });
+    }
+
     const requestId = generateRequestID();
     const amountKobo = Math.round(amount * 100);
 
-    // ✅ Debit wallet
-    const debitResult = await debitWallet(uid, requestId, amountKobo, { purpose: "buy_airtime" });
-    if (!debitResult.success) return res.status(400).json({ error: "Insufficient wallet balance" });
-
-    // ✅ Call provider in try-catch
+    // ================= CALL PROVIDER FIRST =================
     let providerResponse;
     try {
       providerResponse = await axios.get(
-        `${process.env.CLUBKONNECT_AIRTIME_URL}?UserID=${process.env.CLUBKONNECT_USER_ID}` +
-        `&APIKey=${process.env.CLUBKONNECT_API_KEY}` +
-        `&MobileNetwork=${network}` +
-        `&Amount=${amount}` +
-        `&MobileNumber=${phone}` +
-        `&RequestID=${requestId}`
+        process.env.CLUBKONNECT_AIRTIME_URL,
+        {
+          params: {
+            UserID: process.env.CLUBKONNECT_USER_ID,
+            APIKey: process.env.CLUBKONNECT_API_KEY,
+            MobileNetwork: providerNetwork, // ✅ FIXED
+            Amount: amount,
+            MobileNumber: phone,
+            RequestID: requestId,
+          },
+        }
       );
-    } catch (providerErr) {
-      // Refund immediately if provider call fails
-      await creditWalletIdempotent(uid, "REFUND-" + Date.now(), amountKobo, { reason: "airtime_provider_failed" });
-      return res.status(500).json({ error: "Provider call failed", detail: providerErr.message });
+    } catch (err) {
+      return res.status(500).json({
+        error: "Provider request failed",
+        detail: err.response?.data || err.message,
+      });
     }
 
-    // ✅ Save transaction
+    // ❌ Provider responded but failed
+    if (providerResponse.data?.status !== "success") {
+      return res.status(400).json({
+        error: "Airtime purchase failed",
+        detail: providerResponse.data,
+      });
+    }
+
+    // ================= DEBIT WALLET AFTER SUCCESS =================
+    const debitResult = await debitWallet(
+      uid,
+      requestId,
+      amountKobo,
+      { purpose: "buy_airtime" }
+    );
+
+    if (!debitResult.success) {
+      // ⚠️ Very rare: provider success but wallet failed
+      return res.status(400).json({
+        error: "Insufficient wallet balance",
+        note: "Provider succeeded, wallet not debited",
+      });
+    }
+
+    // ================= SAVE TRANSACTION =================
     await Transaction.create({
       userId: uid,
       phone,
@@ -68,27 +105,28 @@ exports.buyAirtime = async (req, res) => {
       provider: "CLUBKONNECT",
       amount,
       requestId,
-      status: providerResponse.data?.status === "success" ? "success" : "failed",
+      status: "success",
       providerResponse: providerResponse.data,
     });
 
-    // Refund if provider returns failed status
-    if (providerResponse.data?.status !== "success") {
-      await creditWalletIdempotent(uid, "REFUND-" + Date.now(), amountKobo, { reason: "airtime_failed" });
-      return res.status(500).json({ error: "Airtime purchase failed", detail: providerResponse.data });
-    }
+    return res.json({
+      status: true,
+      message: "Airtime purchase successful",
+      requestId,
+    });
 
-    res.json({ status: true, message: "Airtime purchase successful", requestId });
   } catch (err) {
-    console.error("Buy airtime failed:", err.message);
-    res.status(500).json({ status: false, error: err.message || "Transaction failed" });
+    console.error("Buy airtime error:", err);
+    return res.status(500).json({
+      status: false,
+      error: "Internal server error",
+    });
   }
-};
-// ================== BUY DATA ==================
+};// ================== BUY DATA ==================
 exports.buyData = async (req, res) => {
   try {
-    // 🔐 UID from Firebase
-    const uid = req.auth.uid;
+    const uid = req.auth?.uid;
+    if (!uid) return res.status(401).json({ error: "Unauthorized" });
 
     const { planId, phone } = req.body;
     if (!planId || !phone) {
@@ -103,16 +141,61 @@ exports.buyData = async (req, res) => {
     const requestId = generateRequestID();
     const amountKobo = Math.round(plan.sellingPrice * 100);
 
-    const debitResult = await debitWallet(uid, requestId, amountKobo, {
-      purpose: "buy_data",
-      planId,
-    });
+    // ================= PROVIDER CALL FIRST =================
+    let providerResponse;
 
-    if (!debitResult.success) {
-      return res.status(400).json({ error: "Insufficient wallet balance" });
+    try {
+      if (plan.provider === "CLUBKONNECT") {
+        const mappedNetwork = clubKonnectNetworkMap[plan.network];
+        if (!mappedNetwork) {
+          return res.status(400).json({ error: "Invalid network for ClubKonnect" });
+        }
+
+        providerResponse = await clubKonnectService.buyData({
+          network: mappedNetwork,
+          dataplan: plan.dataValue,
+          phone,
+          request_id: requestId,
+        });
+      } else {
+        providerResponse = await smeplugService.buyData({
+          network: plan.network,
+          plan_code: plan.apiCode,
+          phone,
+          request_id: requestId,
+        });
+      }
+    } catch (err) {
+      return res.status(500).json({
+        error: "Provider request failed",
+        detail: err.response?.data || err.message,
+      });
     }
 
-    const tx = await Transaction.create({
+    if (providerResponse?.status !== "success") {
+      return res.status(400).json({
+        error: "Data purchase failed",
+        detail: providerResponse,
+      });
+    }
+
+    // ================= DEBIT WALLET AFTER SUCCESS =================
+    const debitResult = await debitWallet(
+      uid,
+      requestId,
+      amountKobo,
+      { purpose: "buy_data", planId }
+    );
+
+    if (!debitResult.success) {
+      return res.status(400).json({
+        error: "Insufficient wallet balance",
+        note: "Provider succeeded but wallet not debited",
+      });
+    }
+
+    // ================= SAVE TRANSACTION =================
+    await Transaction.create({
       userId: uid,
       phone,
       network: plan.network,
@@ -120,51 +203,21 @@ exports.buyData = async (req, res) => {
       dataPlan: plan._id,
       amount: plan.sellingPrice,
       requestId,
-      status: "pending",
+      status: "success",
+      providerResponse,
     });
 
-    let providerResponse;
-    if (plan.provider === "CLUBKONNECT") {
-      providerResponse = await clubKonnectService.buyData({
-        network: plan.network,
-        dataplan: plan.dataValue,
-        phone,
-      });
-    } else {
-      providerResponse = await smeplugService.buyData({
-        network: plan.network,
-        plan_code: plan.apiCode,
-        phone,
-        request_id: requestId,
-      });
-    }
+    res.json({
+      status: true,
+      message: "Data purchase successful",
+      requestId,
+    });
 
-    tx.status = "success";
-    tx.providerResponse = providerResponse;
-    await tx.save();
-
-    res.json({ status: true, message: "Data purchase successful", requestId });
   } catch (err) {
-    console.error("Buy data failed:", err.message);
-
-    await creditWalletIdempotent(
-      req.auth.uid,
-      "REFUND-" + Date.now(),
-      0,
-      { reason: "data_purchase_failed" }
-    );
-
-    res.status(500).json({ status: false, error: err.message });
-  }
-};
-// ================== VERIFY TRANSACTION ==================
-exports.verifyTransaction = async (req, res) => {
-  try {
-    const { request_id } = req.params;
-    const url = `https://www.nellobytesystems.com/APIQuery.asp?UserID=${process.env.CLUBKONNECT_USER_ID}&APIKey=${process.env.CLUBKONNECT_API_KEY}&RequestID=${request_id}`;
-    const response = await axios.get(url);
-    res.json(response.data);
-  } catch (err) {
-    res.status(500).json({ status: false, error: err.response?.data || err.message });
+    console.error("Buy data failed:", err);
+    res.status(500).json({
+      status: false,
+      error: "Internal server error",
+    });
   }
 };
