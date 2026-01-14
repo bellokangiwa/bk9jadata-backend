@@ -28,7 +28,6 @@ exports.getAirtimeServices = async (req, res) => {
 // ================== BUY AIRTIME ==================
 exports.buyAirtime = async (req, res) => {
   try {
-    // Use Firebase UID from middleware
     const uid = req.auth?.uid;
     if (!uid) return res.status(401).json({ error: "Unauthorized" });
 
@@ -38,28 +37,30 @@ exports.buyAirtime = async (req, res) => {
     }
 
     const requestId = generateRequestID();
-    const amountKobo = Math.round(amount * 100); // Convert Naira to Kobo
+    const amountKobo = Math.round(amount * 100);
 
-    // ✅ Only debit wallet after validation
-    const debitResult = await debitWallet(uid, requestId, amountKobo, {
-      purpose: "buy_airtime",
-    });
+    // ✅ Debit wallet
+    const debitResult = await debitWallet(uid, requestId, amountKobo, { purpose: "buy_airtime" });
+    if (!debitResult.success) return res.status(400).json({ error: "Insufficient wallet balance" });
 
-    if (!debitResult.success) {
-      return res.status(400).json({ error: "Insufficient wallet balance" });
-    }
-
-    // Call ClubKonnect Airtime API
-    const providerResponse = await axios.get(
-      `${process.env.CLUBKONNECT_AIRTIME_URL}?UserID=${process.env.CLUBKONNECT_USER_ID}` +
+    // ✅ Call provider in try-catch
+    let providerResponse;
+    try {
+      providerResponse = await axios.get(
+        `${process.env.CLUBKONNECT_AIRTIME_URL}?UserID=${process.env.CLUBKONNECT_USER_ID}` +
         `&APIKey=${process.env.CLUBKONNECT_API_KEY}` +
         `&MobileNetwork=${network}` +
         `&Amount=${amount}` +
         `&MobileNumber=${phone}` +
         `&RequestID=${requestId}`
-    );
+      );
+    } catch (providerErr) {
+      // Refund immediately if provider call fails
+      await creditWalletIdempotent(uid, "REFUND-" + Date.now(), amountKobo, { reason: "airtime_provider_failed" });
+      return res.status(500).json({ error: "Provider call failed", detail: providerErr.message });
+    }
 
-    // Save transaction
+    // ✅ Save transaction
     await Transaction.create({
       userId: uid,
       phone,
@@ -71,12 +72,10 @@ exports.buyAirtime = async (req, res) => {
       providerResponse: providerResponse.data,
     });
 
-    // Refund if failed
+    // Refund if provider returns failed status
     if (providerResponse.data?.status !== "success") {
-      await creditWalletIdempotent(uid, "REFUND-" + Date.now(), amountKobo, {
-        reason: "airtime_failed",
-      });
-      return res.status(500).json({ error: "Airtime purchase failed" });
+      await creditWalletIdempotent(uid, "REFUND-" + Date.now(), amountKobo, { reason: "airtime_failed" });
+      return res.status(500).json({ error: "Airtime purchase failed", detail: providerResponse.data });
     }
 
     res.json({ status: true, message: "Airtime purchase successful", requestId });
