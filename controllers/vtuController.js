@@ -38,70 +38,16 @@ exports.buyAirtime = async (req, res) => {
       return res.status(400).json({ error: "Missing required fields" });
     }
 
-    // ✅ Convert network to ClubKonnect code
+    // Convert network
     const providerNetwork = clubKonnectNetworkMap[network];
     if (!providerNetwork) {
-      return res.status(400).json({
-        error: "Invalid network",
-        allowed: ["MTN", "GLO", "AIRTEL", "9MOBILE"],
-      });
+      return res.status(400).json({ error: "Invalid network" });
     }
 
     const requestId = generateRequestID();
     const amountKobo = Math.round(amount * 100);
 
-    // ================= CALL PROVIDER FIRST =================
-    let providerResponse;
-    try {
-      providerResponse = await axios.get(
-        process.env.CLUBKONNECT_AIRTIME_URL,
-        {
-          params: {
-            UserID: process.env.CLUBKONNECT_USER_ID,
-            APIKey: process.env.CLUBKONNECT_API_KEY,
-            MobileNetwork: providerNetwork, // ✅ FIXED
-            Amount: amount,
-            MobileNumber: phone,
-            RequestID: requestId,
-          },
-        }
-      );
-    } catch (err) {
-      return res.status(500).json({
-        error: "Provider request failed",
-        detail: err.response?.data || err.message,
-      });
-    }
-
-    // ❌ Provider responded but failed
-    const clubResponse = response.data;
-
-// ✅ SUCCESS FROM CLUBKONNECT
-if (clubResponse.statuscode === "100") {
-
-  await Transaction.create({
-    orderId: clubResponse.orderid,
-    network: clubResponse.mobilenetwork,
-    phone: clubResponse.mobilenumber,
-    amount: clubResponse.amount,
-    provider: "CLUBKONNECT",
-    status: "SUCCESS"
-  });
-
-  return res.status(200).json({
-    success: true,
-    message: "Airtime purchase successful",
-    data: clubResponse
-  });
-}
-
-// ❌ FAILURE FROM CLUBKONNECT
-return res.status(400).json({
-  error: "Airtime purchase failed",
-  detail: clubResponse
-});
-
-    // ================= DEBIT WALLET AFTER SUCCESS =================
+    // 1️⃣ DEBIT WALLET FIRST
     const debitResult = await debitWallet(
       uid,
       requestId,
@@ -110,29 +56,76 @@ return res.status(400).json({
     );
 
     if (!debitResult.success) {
-      // ⚠️ Very rare: provider success but wallet failed
-      return res.status(400).json({
-        error: "Insufficient wallet balance",
-        note: "Provider succeeded, wallet not debited",
+      return res.status(400).json({ error: "Insufficient wallet balance" });
+    }
+
+    // 2️⃣ CALL PROVIDER
+    let providerResponse;
+    try {
+      providerResponse = await axios.get(
+        process.env.CLUBKONNECT_AIRTIME_URL,
+        {
+          params: {
+            UserID: process.env.CLUBKONNECT_USER_ID,
+            APIKey: process.env.CLUBKONNECT_API_KEY,
+            MobileNetwork: providerNetwork,
+            Amount: amount,
+            MobileNumber: phone,
+            RequestID: requestId,
+          },
+        }
+      );
+    } catch (err) {
+      // 🔁 REFUND ON PROVIDER FAILURE
+      await creditWalletIdempotent(
+        uid,
+        "REFUND-" + requestId,
+        amountKobo,
+        { reason: "airtime_provider_failed" }
+      );
+
+      return res.status(500).json({
+        error: "Provider request failed",
+        detail: err.response?.data || err.message,
       });
     }
 
-    // ================= SAVE TRANSACTION =================
+    const clubResponse = providerResponse.data;
+
+    // 3️⃣ CHECK PROVIDER STATUS
+    if (clubResponse.statuscode !== "100") {
+      await creditWalletIdempotent(
+        uid,
+        "REFUND-" + requestId,
+        amountKobo,
+        { reason: "airtime_failed" }
+      );
+
+      return res.status(400).json({
+        error: "Airtime purchase failed",
+        detail: clubResponse,
+      });
+    }
+
+    // 4️⃣ SAVE TRANSACTION
     await Transaction.create({
       userId: uid,
+      orderId: clubResponse.orderid,
       phone,
       network,
       provider: "CLUBKONNECT",
       amount,
       requestId,
       status: "success",
-      providerResponse: providerResponse.data,
+      providerResponse: clubResponse,
     });
 
-    return res.json({
-      status: true,
+    // 5️⃣ SUCCESS RESPONSE
+    return res.status(200).json({
+      success: true,
       message: "Airtime purchase successful",
       requestId,
+      orderId: clubResponse.orderid,
     });
 
   } catch (err) {
@@ -142,7 +135,8 @@ return res.status(400).json({
       error: "Internal server error",
     });
   }
-};// ================== BUY DATA ==================
+};
+// ================== BUY DATA ==================
 exports.buyData = async (req, res) => {
   try {
     const uid = req.auth?.uid;
