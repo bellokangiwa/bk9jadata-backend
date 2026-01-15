@@ -74,12 +74,32 @@ exports.buyAirtime = async (req, res) => {
     }
 
     // ❌ Provider responded but failed
-    if (providerResponse.data?.status !== "success") {
-      return res.status(400).json({
-        error: "Airtime purchase failed",
-        detail: providerResponse.data,
-      });
-    }
+    const clubResponse = response.data;
+
+// ✅ SUCCESS FROM CLUBKONNECT
+if (clubResponse.statuscode === "100") {
+
+  await Transaction.create({
+    orderId: clubResponse.orderid,
+    network: clubResponse.mobilenetwork,
+    phone: clubResponse.mobilenumber,
+    amount: clubResponse.amount,
+    provider: "CLUBKONNECT",
+    status: "SUCCESS"
+  });
+
+  return res.status(200).json({
+    success: true,
+    message: "Airtime purchase successful",
+    data: clubResponse
+  });
+}
+
+// ❌ FAILURE FROM CLUBKONNECT
+return res.status(400).json({
+  error: "Airtime purchase failed",
+  detail: clubResponse
+});
 
     // ================= DEBIT WALLET AFTER SUCCESS =================
     const debitResult = await debitWallet(
