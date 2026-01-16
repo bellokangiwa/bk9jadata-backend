@@ -24,6 +24,16 @@ exports.getAirtimeServices = async (req, res) => {
     res.status(500).json({ error: err.response?.data || err.message });
   }
 };
+function calculateDiscount(network, amount) {
+  const discounts = {
+    MTN: 2,
+    AIRTEL: 2,
+    GLO: 6,
+    "9MOBILE": 5,
+  };
+
+  return amount - (discounts[network] || 0);
+}
 
 // ================== BUY AIRTIME ==================
 exports.buyAirtime = async (req, res) => {
@@ -33,10 +43,18 @@ exports.buyAirtime = async (req, res) => {
       return res.status(401).json({ error: "Unauthorized" });
     }
 
-    const { network, amount, phone } = req.body;
+    const network = req.body.network?.toUpperCase();
+    const amount = req.body.amount;
+    const phone = req.body.phone;
     if (!network || !amount || !phone) {
-      return res.status(400).json({ error: "Missing required fields" });
-    }
+  return res.status(400).json({ error: "Missing required fields" });
+}
+
+if (amount < 50) {
+  return res.status(400).json({
+    error: "Minimum airtime purchase is ₦50",
+  });
+}
 
     // Convert network
     const providerNetwork = clubKonnectNetworkMap[network];
@@ -45,7 +63,8 @@ exports.buyAirtime = async (req, res) => {
     }
 
     const requestId = generateRequestID();
-    const amountKobo = Math.round(amount * 100);
+    const finalAmount = calculateDiscount(network, amount);
+    const amountKobo = Math.round(finalAmount * 100);
 
     // 1️⃣ DEBIT WALLET FIRST
     const debitResult = await debitWallet(
