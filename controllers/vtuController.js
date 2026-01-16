@@ -192,11 +192,10 @@ exports.buyData = async (req, res) => {
         });
       } else {
         providerResponse = await smeplugService.buyData({
-          network: plan.network,
-          plan_code: plan.apiCode,
-          phone,
-          request_id: requestId,
-        });
+  network_id: plan.smeplugNetworkId,
+  plan_id: plan.smeplugPlanId,
+  phone,
+});
       }
     } catch (err) {
       return res.status(500).json({
@@ -205,12 +204,12 @@ exports.buyData = async (req, res) => {
       });
     }
 
-    if (providerResponse?.status !== "success") {
-      return res.status(400).json({
-        error: "Data purchase failed",
-        detail: providerResponse,
-      });
-    }
+    if (providerResponse.status !== "success") {
+  return res.status(400).json({
+    error: "Data purchase failed",
+    detail: providerResponse,
+  });
+}
 
     // ================= DEBIT WALLET AFTER SUCCESS =================
     const debitResult = await debitWallet(

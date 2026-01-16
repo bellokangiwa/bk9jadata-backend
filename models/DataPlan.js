@@ -41,7 +41,16 @@ const dataPlanSchema = new mongoose.Schema(
       type: String,
       default: null,
     },
+    // SMEPLUG ONLY
+smeplugNetworkId: {
+  type: Number,
+  default: null,
+},
 
+smeplugPlanId: {
+  type: Number,
+  default: null,
+},
     // ClubKonnect only (e.g 1000, 500.01)
     dataValue: {
       type: Number,
