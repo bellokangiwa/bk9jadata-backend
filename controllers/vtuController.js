@@ -174,36 +174,50 @@ exports.buyData = async (req, res) => {
     const requestId = generateRequestID();
     const amountKobo = Math.round(plan.sellingPrice * 100);
 
-    // ================= PROVIDER CALL FIRST =================
-    let providerResponse;
+   // ================= PROVIDER CALL FIRST =================
+let providerResponse;
 
-    try {
-      if (plan.provider === "CLUBKONNECT") {
-        const mappedNetwork = clubKonnectNetworkMap[plan.network];
-        if (!mappedNetwork) {
-          return res.status(400).json({ error: "Invalid network for ClubKonnect" });
-        }
+try {
+  if (plan.provider === "CLUBKONNECT") {
+    const mappedNetwork = clubKonnectNetworkMap[plan.network];
+    if (!mappedNetwork) {
+      return res.status(400).json({ error: "Invalid network for ClubKonnect" });
+    }
 
-        providerResponse = await clubKonnectService.buyData({
-          network: mappedNetwork,
-          dataplan: plan.dataValue,
-          phone,
-          request_id: requestId,
-        });
-      } else {
-        providerResponse = await smeplugService.buyData({
-  network_id: plan.smeplugNetworkId,
-  plan_id: plan.smeplugPlanId,
-  phone,
-});
-      }
-    } catch (err) {
-      return res.status(500).json({
-        error: "Provider request failed",
-        detail: err.response?.data || err.message,
+    providerResponse = await clubKonnectService.buyData({
+      network: mappedNetwork,
+      dataplan: plan.dataValue,
+      phone,
+      request_id: requestId,
+    });
+
+  } else if (plan.provider === "SMEPLUG") {
+
+    if (!plan.smeplugNetworkId || !plan.smeplugPlanId) {
+      return res.status(400).json({
+        error: "SMEplug plan not configured properly",
+        note: "Missing networkId or planId",
       });
     }
 
+    providerResponse = await smeplugService.buyData({
+      network_id: plan.smeplugNetworkId,
+      plan_id: plan.smeplugPlanId,
+      phone,
+    });
+
+  } else {
+    return res.status(400).json({
+      error: "Unsupported provider",
+    });
+  }
+
+} catch (err) {
+  return res.status(500).json({
+    error: "Provider request failed",
+    detail: err.response?.data || err.message,
+  });
+}
     if (providerResponse.status !== "success") {
   return res.status(400).json({
     error: "Data purchase failed",
@@ -228,16 +242,17 @@ exports.buyData = async (req, res) => {
 
     // ================= SAVE TRANSACTION =================
     await Transaction.create({
-      userId: uid,
-      phone,
-      network: plan.network,
-      provider: plan.provider,
-      dataPlan: plan._id,
-      amount: plan.sellingPrice,
-      requestId,
-      status: "success",
-      providerResponse,
-    });
+  userId: uid,
+  phone,
+  network: plan.network,
+  provider: plan.provider,
+  dataPlan: plan._id,
+  amount: plan.sellingPrice,
+  requestId,
+  providerReference: providerResponse.reference, 
+  status: "success",
+  providerResponse,
+});
 
     res.json({
       status: true,

@@ -7,6 +7,8 @@ module.exports = [
     planType: "DAILY",
     name: "1GB Daily Awoof",
     apiCode: "452",
+    smeplugNetworkId: 1,    
+    smeplugPlanId: 452,      
     costPrice: 250,
     sellingPrice: 300,
     status: "active"
@@ -18,6 +20,8 @@ module.exports = [
     planType: "DAILY",
     name: "7GB 2Days Awoof",
     apiCode: "445",
+    smeplugNetworkId: 1,
+    smeplugPlanId: 445,
     costPrice: 1800,
     sellingPrice: 1850,
     status: "active"
@@ -29,6 +33,8 @@ module.exports = [
     planType: "DAILY",
     name: "1GB Daily Gifting",
     apiCode: "11",
+    smeplugNetworkId: 1,
+    smeplugPlanId: 11,
     costPrice: 485,
     sellingPrice: 500,
     status: "active"
@@ -40,6 +46,8 @@ module.exports = [
     planType: "DAILY",
     name: "1.5GB 2Days Gifting",
     apiCode: "231",
+    smeplugNetworkId: 1,
+    smeplugPlanId: 231,
     costPrice: 582,
     sellingPrice: 600,
     status: "active"
@@ -51,6 +59,8 @@ module.exports = [
     planType: "DAILY",
     name: "2GB 2Days Gifting",
     apiCode: "227",
+    smeplugNetworkId: 1,
+    smeplugPlanId: 227,
     costPrice: 728,
     sellingPrice: 800,
     status: "active"
@@ -62,6 +72,8 @@ module.exports = [
     planType: "DAILY",
     name: "2.5GB 2Days Gifting",
     apiCode: "13",
+    smeplugNetworkId: 1,
+    smeplugPlanId: 13,
     costPrice: 873,
     sellingPrice: 900,
     status: "active"
@@ -73,6 +85,8 @@ module.exports = [
     planType: "DAILY",
     name: "75MB DAILY Gifting",
     apiCode: "6",
+    smeplugNetworkId: 1,
+    smeplugPlanId: 6,
     costPrice: 73,
     sellingPrice: 73,
     status: "active"
@@ -88,6 +102,8 @@ module.exports = [
     category: "SHARE",
     name: "500MB Share Weekly",
     apiCode: "423",
+    smeplugNetworkId: 1,
+    smeplugPlanId: 423,
     costPrice: 300,
     sellingPrice: 350,
     status: "active"
@@ -99,6 +115,8 @@ module.exports = [
     planType: "WEEKLY",
     name: "1GB Share Weekly",
     apiCode: "424",
+    smeplugNetworkId: 1,
+    smeplugPlanId: 424,
     costPrice: 420,
     sellingPrice: 450,
     status: "active"
@@ -110,6 +128,8 @@ module.exports = [
     planType: "WEEKLY",
     name: "2GB Share Weekly",
     apiCode: "425",
+    smeplugNetworkId: 1,
+    smeplugPlanId: 425,
     costPrice: 840,
     sellingPrice: 900,
     status: "active"
@@ -121,6 +141,8 @@ module.exports = [
     planType: "WEEKLY",
     name: "3GB Share Weekly",
     apiCode: "426",
+    smeplugNetworkId: 1,
+    smeplugPlanId: 426,
     costPrice: 1260,
     sellingPrice: 1300,
     status: "active"
@@ -132,6 +154,8 @@ module.exports = [
     planType: "WEEKLY",
     name: "5GB Share Weekly",
     apiCode: "427",
+    smeplugNetworkId: 1,
+    smeplugPlanId: 427,
     costPrice: 2000,
     sellingPrice: 2100,
     status: "active"
@@ -143,6 +167,8 @@ module.exports = [
     planType: "WEEKLY",
     name: "40MB Facebook Weekly",
     apiCode: "246",
+    smeplugNetworkId: 1,
+    smeplugPlanId: 246,
     costPrice: 49,
     sellingPrice: 50,
     status: "active"
@@ -152,8 +178,10 @@ module.exports = [
     provider: "SMEPLUG",
     category: "SOCIAL",
     planType: "WEEKLY",
-    name: "40MB Watsapp Weekly",
+    name: "40MB WatsApp Weekly",
     apiCode: "247",
+    smeplugNetworkId: 1,
+    smeplugPlanId: 247,
     costPrice: 49,
     sellingPrice: 50,
     status: "active"
@@ -165,6 +193,8 @@ module.exports = [
     planType: "WEEKLY",
     name: "470MB All Social Weekly",
     apiCode: "266",
+    smeplugNetworkId: 1,
+    smeplugPlanId: 266,
     costPrice: 194,
     sellingPrice: 200,
     status: "active"
@@ -176,6 +206,8 @@ module.exports = [
     planType: "WEEKLY",
     name: "1GB IG/TT/YT Weekly",
     apiCode: "249",
+    smeplugNetworkId: 1,
+    smeplugPlanId: 249,
     costPrice: 291,
     sellingPrice: 295,
     status: "active"
@@ -187,6 +219,8 @@ module.exports = [
     planType: "WEEKLY",
     name: "2GB TikTok Weekly",
     apiCode: "250",
+    smeplugNetworkId: 1,
+    smeplugPlanId: 250,
     costPrice: 388,
     sellingPrice: 400,
     status: "active"
@@ -198,6 +232,8 @@ module.exports = [
     planType: "WEEKLY",
     name: "1GB All Social Weekly",
     apiCode: "256",
+    smeplugNetworkId: 1,
+    smeplugPlanId: 256,
     costPrice: 437,
     sellingPrice: 450,
     status: "active"
@@ -211,6 +247,8 @@ module.exports = [
     planType: "MONTHLY",
     name: "500MB SME Monthly",
     apiCode: "172",
+    smeplugNetworkId: 1,
+    smeplugPlanId: 172,
     costPrice: 395,
     sellingPrice: 420,
     status: "active"
@@ -222,6 +260,8 @@ module.exports = [
     planType: "MONTHLY",
     name: "1GB SME Monthly",
     apiCode: "173",
+    smeplugNetworkId: 1,
+    smeplugPlanId: 173,
     costPrice: 550,
     sellingPrice: 580,
     status: "active"
@@ -233,6 +273,8 @@ module.exports = [
     planType: "MONTHLY",
     name: "2GB SME Monthly",
     apiCode: "174",
+    smeplugNetworkId: 1,
+    smeplugPlanId: 174,
     costPrice: 1090,
     sellingPrice: 1150,
     status: "active"
@@ -244,6 +286,8 @@ module.exports = [
     planType: "MONTHLY",
     name: "3GB SME Monthly",
     apiCode: "175",
+    smeplugNetworkId: 1,
+    smeplugPlanId: 175,
     costPrice: 1590,
     sellingPrice: 1650,
     status: "active"
@@ -255,6 +299,8 @@ module.exports = [
     planType: "MONTHLY",
     name: "5GB SME Monthly",
     apiCode: "176",
+    smeplugNetworkId: 1,
+    smeplugPlanId: 176,
     costPrice: 2450,
     sellingPrice: 2550,
     status: "active"
@@ -268,6 +314,8 @@ module.exports = [
     planType: "MONTHLY",
     name: "6.75GB Corporate Monthly",
     apiCode: "232",
+    smeplugNetworkId: 1,
+    smeplugPlanId: 232,
     costPrice: 2910,
     sellingPrice: 3000,
     status: "active"
@@ -279,6 +327,8 @@ module.exports = [
     planType: "MONTHLY",
     name: "10GB Corporate Monthly",
     apiCode: "22",
+    smeplugNetworkId: 1,
+    smeplugPlanId: 22,
     costPrice: 4365,
     sellingPrice: 4500,
     status: "active"
@@ -290,6 +340,8 @@ module.exports = [
     planType: "MONTHLY",
     name: "20GB Corporate Monthly",
     apiCode: "25",
+    smeplugNetworkId: 1,
+    smeplugPlanId: 25,
     costPrice: 7275,
     sellingPrice: 7500,
     status: "active"
