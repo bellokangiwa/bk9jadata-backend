@@ -174,58 +174,7 @@ exports.buyData = async (req, res) => {
     const requestId = generateRequestID();
     const amountKobo = Math.round(plan.sellingPrice * 100);
 
-   // ================= PROVIDER CALL FIRST =================
-let providerResponse;
-
-try {
-  if (plan.provider === "CLUBKONNECT") {
-    const mappedNetwork = clubKonnectNetworkMap[plan.network];
-    if (!mappedNetwork) {
-      return res.status(400).json({ error: "Invalid network for ClubKonnect" });
-    }
-
-    providerResponse = await clubKonnectService.buyData({
-      network: mappedNetwork,
-      dataplan: plan.dataValue,
-      phone,
-      request_id: requestId,
-    });
-
-  } else if (plan.provider === "SMEPLUG") {
-
-    if (!plan.smeplugNetworkId || !plan.smeplugPlanId) {
-      return res.status(400).json({
-        error: "SMEplug plan not configured properly",
-        note: "Missing networkId or planId",
-      });
-    }
-
-    providerResponse = await smeplugService.buyData({
-      network_id: plan.smeplugNetworkId,
-      plan_id: plan.smeplugPlanId,
-      phone,
-    });
-
-  } else {
-    return res.status(400).json({
-      error: "Unsupported provider",
-    });
-  }
-
-} catch (err) {
-  return res.status(500).json({
-    error: "Provider request failed",
-    detail: err.response?.data || err.message,
-  });
-}
-    if (providerResponse.status !== "success") {
-  return res.status(400).json({
-    error: "Data purchase failed",
-    detail: providerResponse,
-  });
-}
-
-    // ================= DEBIT WALLET AFTER SUCCESS =================
+    // ================= 1️⃣ DEBIT WALLET FIRST =================
     const debitResult = await debitWallet(
       uid,
       requestId,
@@ -236,25 +185,122 @@ try {
     if (!debitResult.success) {
       return res.status(400).json({
         error: "Insufficient wallet balance",
-        note: "Provider succeeded but wallet not debited",
       });
     }
 
-    // ================= SAVE TRANSACTION =================
-    await Transaction.create({
-  userId: uid,
-  phone,
-  network: plan.network,
-  provider: plan.provider,
-  dataPlan: plan._id,
-  amount: plan.sellingPrice,
-  requestId,
-  providerReference: providerResponse.reference, 
-  status: "success",
-  providerResponse,
-});
+    // ================= 2️⃣ CALL PROVIDER =================
+    let providerResponse;
 
-    res.json({
+    try {
+      if (plan.provider === "CLUBKONNECT") {
+
+        const mappedNetwork = clubKonnectNetworkMap[plan.network];
+        if (!mappedNetwork) {
+          // Refund before returning
+          await creditWalletIdempotent(
+            uid,
+            "REFUND-" + requestId,
+            amountKobo,
+            { reason: "invalid_network_mapping" }
+          );
+
+          return res.status(400).json({
+            error: "Invalid network for ClubKonnect",
+          });
+        }
+
+        providerResponse = await clubKonnectService.buyData({
+          network: mappedNetwork,
+          dataplan: plan.dataValue,
+          phone,
+          request_id: requestId,
+        });
+
+      } else if (plan.provider === "SMEPLUG") {
+
+        if (!plan.smeplugNetworkId || !plan.smeplugPlanId) {
+
+          await creditWalletIdempotent(
+            uid,
+            "REFUND-" + requestId,
+            amountKobo,
+            { reason: "smeplug_config_error" }
+          );
+
+          return res.status(400).json({
+            error: "SMEplug plan not configured properly",
+            note: "Missing networkId or planId",
+          });
+        }
+
+        providerResponse = await smeplugService.buyData({
+          network_id: plan.smeplugNetworkId,
+          plan_id: plan.smeplugPlanId,
+          phone,
+        });
+
+      } else {
+
+        await creditWalletIdempotent(
+          uid,
+          "REFUND-" + requestId,
+          amountKobo,
+          { reason: "unsupported_provider" }
+        );
+
+        return res.status(400).json({
+          error: "Unsupported provider",
+        });
+      }
+
+    } catch (err) {
+
+      // 🔁 Refund if provider call fails
+      await creditWalletIdempotent(
+        uid,
+        "REFUND-" + requestId,
+        amountKobo,
+        { reason: "provider_request_failed" }
+      );
+
+      return res.status(500).json({
+        error: "Provider request failed",
+        detail: err.response?.data || err.message,
+      });
+    }
+
+    // ================= 3️⃣ CHECK PROVIDER STATUS =================
+    if (providerResponse.status !== "success") {
+
+      await creditWalletIdempotent(
+        uid,
+        "REFUND-" + requestId,
+        amountKobo,
+        { reason: "data_purchase_failed" }
+      );
+
+      return res.status(400).json({
+        error: "Data purchase failed",
+        detail: providerResponse,
+      });
+    }
+
+    // ================= 4️⃣ SAVE TRANSACTION =================
+    await Transaction.create({
+      userId: uid,
+      phone,
+      network: plan.network,
+      provider: plan.provider,
+      dataPlan: plan._id,
+      amount: plan.sellingPrice,
+      requestId,
+      providerReference: providerResponse.reference,
+      status: "success",
+      providerResponse,
+    });
+
+    // ================= 5️⃣ SUCCESS RESPONSE =================
+    return res.json({
       status: true,
       message: "Data purchase successful",
       requestId,
@@ -262,33 +308,168 @@ try {
 
   } catch (err) {
     console.error("Buy data failed:", err);
-    res.status(500).json({
+    return res.status(500).json({
       status: false,
       error: "Internal server error",
     });
   }
 };
-// ================== VERIFY TRANSACTION ==================
-exports.verifyTransaction = async (req, res) => {
+// ================== BUY RECHARGE CARD (E-PIN) ==================
+exports.buyRechargeCard = async (req, res) => {
   try {
-    const { request_id } = req.params;
+    const uid = req.auth?.uid;
+    if (!uid) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
 
-    const response = await axios.get(
-      "https://www.nellobytesystems.com/APIQuery.asp",
-      {
-        params: {
-          UserID: process.env.CLUBKONNECT_USER_ID,
-          APIKey: process.env.CLUBKONNECT_API_KEY,
-          RequestID: request_id,
-        },
-      }
+    const { network, value, quantity } = req.body;
+
+    // ✅ Validate presence (without breaking 0 values)
+    if (!network || value == null || quantity == null) {
+      return res.status(400).json({ error: "Missing required fields" });
+    }
+
+    // ✅ Convert safely to numbers
+    const parsedValue = Number(value);
+    const parsedQuantity = Number(quantity);
+
+    if (isNaN(parsedValue) || isNaN(parsedQuantity)) {
+      return res.status(400).json({
+        error: "Invalid value or quantity",
+      });
+    }
+
+    if (parsedQuantity < 1 || parsedQuantity > 20) {
+      return res.status(400).json({
+        error: "Quantity must be between 1 and 20",
+      });
+    }
+
+    const requestId = generateRequestID();
+
+    const totalAmount = parsedValue * parsedQuantity;
+    const amountKobo = Math.round(totalAmount * 100);
+
+    // 1️⃣ DEBIT WALLET FIRST
+    const debitResult = await debitWallet(
+      uid,
+      requestId,
+      amountKobo,
+      { purpose: "buy_recharge_card", network, value: parsedValue, quantity: parsedQuantity }
     );
 
-    return res.json(response.data);
+    if (!debitResult.success) {
+      return res.status(400).json({
+        error: "Insufficient wallet balance",
+      });
+    }
+
+    // 2️⃣ CALL NELLOBYTE API
+    let providerResponse;
+    try {
+      providerResponse = await axios.get(
+        "https://www.nellobytesystems.com/APIEPINV1.asp",
+        {
+          params: {
+            UserID: process.env.NELLOBYTE_USER_ID,
+            APIKey: process.env.NELLOBYTE_API_KEY,
+            MobileNetwork: network.toUpperCase(),
+            Value: parsedValue,
+            Quantity: parsedQuantity,
+            RequestID: requestId,
+          },
+        }
+      );
+    } catch (err) {
+      // 🔁 REFUND IF API FAILS
+      await creditWalletIdempotent(
+        uid,
+        "REFUND-" + requestId,
+        amountKobo,
+        { reason: "recharge_provider_failed" }
+      );
+
+      return res.status(500).json({
+        error: "Recharge provider failed",
+        detail: err.response?.data || err.message,
+      });
+    }
+
+    const data = providerResponse.data;
+
+    // 3️⃣ CHECK PROVIDER STATUS
+    if (data.statuscode !== "100") {
+      await creditWalletIdempotent(
+        uid,
+        "REFUND-" + requestId,
+        amountKobo,
+        { reason: "recharge_failed" }
+      );
+
+      return res.status(400).json({
+        error: "Recharge card generation failed",
+        detail: data,
+      });
+    }
+
+    // 4️⃣ SAVE TRANSACTION
+    await Transaction.create({
+      userId: uid,
+      network,
+      amount: totalAmount,
+      quantity: parsedQuantity,
+      provider: "NELLOBYTE",
+      requestId,
+      status: "success",
+      pins: data.pins,
+      providerResponse: data,
+    });
+
+    // 5️⃣ RETURN PINS TO CLIENT (UNCHANGED RESPONSE FORMAT)
+    return res.status(200).json({
+      success: true,
+      message: "Recharge card generated successfully",
+      requestId,
+      pins: data.pins,
+    });
+
   } catch (err) {
+    console.error("Recharge card error:", err);
     return res.status(500).json({
       status: false,
-      error: err.response?.data || err.message,
+      error: "Internal server error",
+    });
+  }
+};
+exports.verifyTransaction = async (req, res) => {
+  try {
+    const uid = req.auth?.uid;
+    if (!uid) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    const { request_id } = req.params;
+
+    const transaction = await Transaction.findOne({
+      userId: uid,
+      requestId: request_id,
+    });
+
+    if (!transaction) {
+      return res.status(404).json({
+        error: "Transaction not found",
+      });
+    }
+
+    return res.json({
+      status: true,
+      transaction,
+    });
+
+  } catch (err) {
+    console.error("Verify transaction error:", err);
+    return res.status(500).json({
+      error: "Internal server error",
     });
   }
 };
