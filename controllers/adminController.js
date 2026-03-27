@@ -1,5 +1,4 @@
 // controllers/adminController.js
-const axios = require("axios");
 const Transaction = require("../models/Transaction");
 
 exports.getAllTransactions = async (req, res) => {
