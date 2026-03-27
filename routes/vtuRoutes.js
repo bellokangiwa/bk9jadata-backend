@@ -16,5 +16,11 @@ router.post("/buy-data", verifyFirebaseToken, vtu.buyData);
 // CHECK TRANSACTION STATUS
 // Optional: you can require auth here too if you want only logged-in users to check
 router.get("/verify/:request_id", verifyFirebaseToken, vtu.verifyTransaction);
+// BUY RECHARGE CARD
+router.post(
+  "/print-recharge",
+  verifyFirebaseToken,
+  vtu.buyRechargeCard
+);
 
 module.exports = router;
