@@ -371,8 +371,8 @@ exports.buyRechargeCard = async (req, res) => {
         "https://www.nellobytesystems.com/APIEPINV1.asp",
         {
           params: {
-            UserID: process.env.NELLOBYTE_USER_ID,
-            APIKey: process.env.NELLOBYTE_API_KEY,
+            UserID: process.env.CLUBKONNECT_USER_ID,
+            APIKey: process.env.CLUBKONNECT_API_KEY,
             MobileNetwork: network.toUpperCase(),
             Value: parsedValue,
             Quantity: parsedQuantity,
@@ -418,7 +418,7 @@ exports.buyRechargeCard = async (req, res) => {
       network,
       amount: totalAmount,
       quantity: parsedQuantity,
-      provider: "NELLOBYTE",
+      provider: "CLUBKONNECT",
       requestId,
       status: "success",
       pins: data.pins,
