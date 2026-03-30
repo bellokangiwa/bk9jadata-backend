@@ -13,3 +13,10 @@ exports.smePlugNetworkMap = {
   "9MOBILE": "03",
   AIRTEL: "02",
 };
+// For Recharge Cards (Nellobyte EPIN)
+exports.rechargeCardNetworkMap = {
+  MTN: "01",
+  GLO: "02",
+  "9MOBILE": "03",
+  AIRTEL: "04",
+};

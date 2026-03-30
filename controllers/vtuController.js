@@ -3,6 +3,7 @@ const DataPlan = require("../models/DataPlan");
 const Transaction = require("../models/Transaction");
 const { debitWallet, creditWalletIdempotent } = require("./walletController");
 const { clubKonnectNetworkMap } = require("../utils/networkMapper");
+const { rechargeCardNetworkMap } = require("../utils/networkMapper");
 const smeplugService = require("../services/smeplugService");
 const clubKonnectService = require("../services/clubkonnectService");
 
