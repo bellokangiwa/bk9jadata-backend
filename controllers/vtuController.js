@@ -325,12 +325,11 @@ exports.buyRechargeCard = async (req, res) => {
 
     const { network, value, quantity } = req.body;
 
-    // ✅ Validate presence (without breaking 0 values)
+    // ✅ Validate input
     if (!network || value == null || quantity == null) {
       return res.status(400).json({ error: "Missing required fields" });
     }
 
-    // ✅ Convert safely to numbers
     const parsedValue = Number(value);
     const parsedQuantity = Number(quantity);
 
@@ -347,11 +346,10 @@ exports.buyRechargeCard = async (req, res) => {
     }
 
     const requestId = generateRequestID();
-
     const totalAmount = parsedValue * parsedQuantity;
     const amountKobo = Math.round(totalAmount * 100);
 
-    // 1️⃣ DEBIT WALLET FIRST
+    // 1️⃣ DEBIT WALLET
     const debitResult = await debitWallet(
       uid,
       requestId,
@@ -365,16 +363,33 @@ exports.buyRechargeCard = async (req, res) => {
       });
     }
 
-    // 2️⃣ CALL NELLOBYTE API
+    // 2️⃣ MAP NETWORK (VERY IMPORTANT FIX)
+    const mappedNetwork = rechargeCardNetworkMap[network.toUpperCase()];
+
+    if (!mappedNetwork) {
+      await creditWalletIdempotent(
+        uid,
+        "REFUND-" + requestId,
+        amountKobo,
+        { reason: "invalid_network_mapping" }
+      );
+
+      return res.status(400).json({
+        error: "Invalid network for recharge card",
+      });
+    }
+
+    // 3️⃣ CALL PROVIDER (FIXED STRUCTURE)
     let providerResponse;
+
     try {
       providerResponse = await axios.get(
         "https://www.nellobytesystems.com/APIEPINV1.asp",
         {
           params: {
-            UserID: process.env.CLUBKONNECT_USER_ID,
-            APIKey: process.env.CLUBKONNECT_API_KEY,
-            MobileNetwork: network.toUpperCase(),
+            UserID: process.env.CLUBKONNECT_USER_ID, 
+            APIKey: process.env.CLUBKONNECT_API_KEY, 
+            MobileNetwork: mappedNetwork, 
             Value: parsedValue,
             Quantity: parsedQuantity,
             RequestID: requestId,
@@ -398,7 +413,7 @@ exports.buyRechargeCard = async (req, res) => {
 
     const data = providerResponse.data;
 
-    // 3️⃣ CHECK PROVIDER STATUS
+    // 4️⃣ CHECK STATUS
     if (data.statuscode !== "100") {
       await creditWalletIdempotent(
         uid,
@@ -413,20 +428,20 @@ exports.buyRechargeCard = async (req, res) => {
       });
     }
 
-    // 4️⃣ SAVE TRANSACTION
+    // 5️⃣ SAVE TRANSACTION
     await Transaction.create({
       userId: uid,
       network,
       amount: totalAmount,
       quantity: parsedQuantity,
-      provider: "CLUBKONNECT",
+      provider: "CLUBKONNECT", 
       requestId,
       status: "success",
       pins: data.pins,
       providerResponse: data,
     });
 
-    // 5️⃣ RETURN PINS TO CLIENT (UNCHANGED RESPONSE FORMAT)
+    // 6️⃣ RESPONSE
     return res.status(200).json({
       success: true,
       message: "Recharge card generated successfully",
@@ -473,4 +488,4 @@ exports.verifyTransaction = async (req, res) => {
       error: "Internal server error",
     });
   }
-};
+}; 
