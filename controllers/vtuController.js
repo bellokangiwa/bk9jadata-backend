@@ -411,6 +411,10 @@ exports.buyRechargeCard = async (req, res) => {
       });
     }
 
+if (!providerResponse || !providerResponse.data) {
+  throw new Error("Invalid provider response");
+}
+
 const data = providerResponse.data;
 
 console.log("EPIN RESPONSE:", data);
