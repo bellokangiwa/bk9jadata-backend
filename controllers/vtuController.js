@@ -414,7 +414,7 @@ exports.buyRechargeCard = async (req, res) => {
 const data = providerResponse.data;
 
 console.log("EPIN RESPONSE:", data);
-if (data.status !== "success" && data.statuscode !== "100") {
+if (data.statuscode !== "100") {
   await creditWalletIdempotent(
     uid,
     "REFUND-" + requestId,
