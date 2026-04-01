@@ -411,22 +411,22 @@ exports.buyRechargeCard = async (req, res) => {
       });
     }
 
-    const data = providerResponse.data;
+const data = providerResponse.data;
 
-    // 4️⃣ CHECK STATUS
-    if (data.statuscode !== "100") {
-      await creditWalletIdempotent(
-        uid,
-        "REFUND-" + requestId,
-        amountKobo,
-        { reason: "recharge_failed" }
-      );
+console.log("EPIN RESPONSE:", data);
+if (data.status !== "success" && data.statuscode !== "100") {
+  await creditWalletIdempotent(
+    uid,
+    "REFUND-" + requestId,
+    amountKobo,
+    { reason: "recharge_failed" }
+  );
 
-      return res.status(400).json({
-        error: "Recharge card generation failed",
-        detail: data,
-      });
-    }
+  return res.status(400).json({
+    error: "Recharge card generation failed",
+    detail: data,
+  });
+}
 
     // 5️⃣ SAVE TRANSACTION
     await Transaction.create({
