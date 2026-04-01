@@ -414,7 +414,7 @@ exports.buyRechargeCard = async (req, res) => {
 const data = providerResponse.data;
 
 console.log("EPIN RESPONSE:", data);
-if (data.statuscode !== "100") {
+if (!data.TXN_EPIN || data.TXN_EPIN.length === 0) {
   await creditWalletIdempotent(
     uid,
     "REFUND-" + requestId,
@@ -437,7 +437,7 @@ if (data.statuscode !== "100") {
       provider: "CLUBKONNECT", 
       requestId,
       status: "success",
-      pins: data.pins,
+      pins: data.TXN_EPIN,
       providerResponse: data,
     });
 
@@ -446,7 +446,7 @@ if (data.statuscode !== "100") {
       success: true,
       message: "Recharge card generated successfully",
       requestId,
-      pins: data.pins,
+      pins: data.TXN_EPIN,
     });
 
   } catch (err) {
