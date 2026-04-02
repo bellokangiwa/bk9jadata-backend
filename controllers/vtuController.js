@@ -378,7 +378,13 @@ exports.buyRechargeCard = async (req, res) => {
         error: "Invalid network for recharge card",
       });
     }
+const allowedValues = [100, 200, 500, 1000];
 
+if (!allowedValues.includes(parsedValue)) {
+  return res.status(400).json({
+    error: "Invalid recharge card value",
+  });
+}
     // 3️⃣ CALL PROVIDER (FIXED STRUCTURE)
     let providerResponse;
 
@@ -415,10 +421,13 @@ if (!providerResponse || !providerResponse.data) {
   throw new Error("Invalid provider response");
 }
 
-const data = providerResponse.data;
+const data = providerResponse?.data || {};
 
-console.log("EPIN RESPONSE:", data);
-if (!data.TXN_EPIN || data.TXN_EPIN.length === 0) {
+console.log("FULL RESPONSE:", providerResponse);
+console.log("RAW DATA:", providerResponse.data);
+const pins = data.TXN_EPIN || data.txn_epin || data.epins || [];
+
+if (!Array.isArray(pins) || pins.length === 0) {
   await creditWalletIdempotent(
     uid,
     "REFUND-" + requestId,
