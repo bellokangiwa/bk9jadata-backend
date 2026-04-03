@@ -421,13 +421,23 @@ if (!providerResponse || !providerResponse.data) {
   throw new Error("Invalid provider response");
 }
 
+// ✅ Extract response safely
 const data = providerResponse?.data || {};
 
 console.log("FULL RESPONSE:", providerResponse);
-console.log("RAW DATA:", providerResponse.data);
-const pins = data.TXN_EPIN || data.txn_epin || data.epins || [];
+console.log("RAW DATA:", data);
 
-if (!Array.isArray(pins) || pins.length === 0) {
+// ✅ Normalize pins from different possible formats
+const pins = Array.isArray(data.TXN_EPIN)
+  ? data.TXN_EPIN
+  : Array.isArray(data.txn_epin)
+  ? data.txn_epin
+  : Array.isArray(data.epins)
+  ? data.epins
+  : [];
+
+// ❌ If no pins → treat as failure and refund
+if (pins.length === 0) {
   await creditWalletIdempotent(
     uid,
     "REFUND-" + requestId,
@@ -441,34 +451,36 @@ if (!Array.isArray(pins) || pins.length === 0) {
   });
 }
 
-    // 5️⃣ SAVE TRANSACTION
-    await Transaction.create({
-      userId: uid,
-      network,
-      amount: totalAmount,
-      quantity: parsedQuantity,
-      provider: "CLUBKONNECT", 
-      requestId,
-      status: "success",
-      pins: data.TXN_EPIN,
-      providerResponse: data,
-    });
+// ✅ SAVE TRANSACTION (use normalized pins)
+await Transaction.create({
+  userId: uid,
+  network,
+  amount: totalAmount,
+  quantity: parsedQuantity,
+  provider: "CLUBKONNECT", 
+  requestId,
+  status: "success",
+  pins: pins, // ✅ FIXED
+  providerResponse: data,
+});
 
-    // 6️⃣ RESPONSE
-    return res.status(200).json({
-      success: true,
-      message: "Recharge card generated successfully",
-      requestId,
-      pins: data.TXN_EPIN,
-    });
+// ✅ SUCCESS RESPONSE
+return res.status(200).json({
+  success: true,
+  message: "Recharge card generated successfully",
+  requestId,
+  pins: pins, // ✅ FIXED
+});
+
 
   } catch (err) {
-    console.error("Recharge card error:", err);
-    return res.status(500).json({
-      status: false,
-      error: "Internal server error",
-    });
-  }
+  console.error("Recharge card error FULL:", err);
+
+  return res.status(500).json({
+    status: false,
+    error: err.message, 
+  });
+}
 };
 exports.verifyTransaction = async (req, res) => {
   try {
