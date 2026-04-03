@@ -454,16 +454,16 @@ if (pins.length === 0) {
 // ✅ SAVE TRANSACTION (use normalized pins)
 await Transaction.create({
   userId: uid,
+  phone: "N/A", // ✅ FIX (since recharge card has no phone)
   network,
   amount: totalAmount,
   quantity: parsedQuantity,
-  provider: "CLUBKONNECT", 
+  provider: "CLUBKONNECT",
   requestId,
   status: "success",
-  pins: pins, // ✅ FIXED
+  pins: pins,
   providerResponse: data,
 });
-
 // ✅ SUCCESS RESPONSE
 return res.status(200).json({
   success: true,
@@ -476,12 +476,19 @@ return res.status(200).json({
   } catch (err) {
   console.error("Recharge card error FULL:", err);
 
+  // 🔁 REFUND USER (VERY IMPORTANT)
+  await creditWalletIdempotent(
+    uid,
+    "REFUND-" + requestId,
+    amountKobo,
+    { reason: "transaction_save_failed" }
+  );
+
   return res.status(500).json({
     status: false,
-    error: err.message, 
+    error: err.message,
   });
-}
-};
+}};
 exports.verifyTransaction = async (req, res) => {
   try {
     const uid = req.auth?.uid;
