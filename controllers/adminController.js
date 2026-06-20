@@ -1,5 +1,8 @@
 // controllers/adminController.js
 const Transaction = require("../models/Transaction");
+const { creditWalletIdempotent } =require("./walletController");
+const { debitWallet } =require("./walletController");
+const createAdminLog =require("../utils/adminLog");
 
 exports.getAllTransactions = async (req, res) => {
   const page = Number(req.query.page || 1);
@@ -58,43 +61,48 @@ const admin = require("firebase-admin");
 
 // 🔐 Admin reset user password
 exports.resetUserPassword = async (req, res) => {
-  try {
-    const { uid, newPassword } = req.body;
+try {
+const { uid, newPassword } = req.body;
 
-    // 1️⃣ Validate input
-    if (!uid || !newPassword) {
-      return res.status(400).json({
-        error: "uid and newPassword are required",
-      });
-    }
+if (!uid || !newPassword) {
+  return res.status(400).json({
+    error: "uid and newPassword are required",
+  });
+}
 
-    // 2️⃣ Enforce 6-digit password
-    if (!/^\d{6}$/.test(newPassword)) {
-      return res.status(400).json({
-        error: "Password must be exactly 6 digits",
-      });
-    }
+if (!/^\d{6}$/.test(newPassword)) {
+  return res.status(400).json({
+    error: "Password must be exactly 6 digits",
+  });
+}
 
-    // 3️⃣ Update password using Firebase Admin SDK
-    await admin.auth().updateUser(uid, {
-      password: newPassword,
-    });
+await admin.auth().updateUser(uid, {
+  password: newPassword,
+});
 
-    // 4️⃣ (Optional but recommended)
-    // Force user to login again everywhere
-    await admin.auth().revokeRefreshTokens(uid);
+await admin.auth().revokeRefreshTokens(uid);
 
-    return res.json({
-      message: "Password reset successfully",
-    });
+await createAdminLog({
+  action: "RESET_PASSWORD",
+  adminUid: req.admin.uid,
+  adminEmail: req.admin.email,
+  targetUser: uid,
+  details: "Password reset by admin",
+});
 
-  } catch (error) {
-    console.error("Reset password error:", error);
+return res.json({
+  success: true,
+  message: "Password reset successfully",
+});
 
-    return res.status(500).json({
-      error: "Failed to reset password",
-    });
-  }
+} catch (error) {
+console.error(error);
+
+return res.status(500).json({
+  error: "Failed to reset password",
+});
+
+}
 };
 exports.getTransactionsByStatus = async (req, res) => {
   try {
@@ -121,4 +129,118 @@ exports.getTransactionsByStatus = async (req, res) => {
       error: "Internal server error",
     });
   }
+};
+// ===== CREDIT USER WALLET =====
+
+
+exports.creditUserWallet = async (req, res) => {
+try {
+
+const { uid, amount } = req.body;
+
+if (!uid || !amount) {
+  return res.status(400).json({
+    error: "uid and amount required",
+  });
+}
+
+const amountKobo =
+  Number(amount) * 100;
+
+const txId =
+  "ADMIN-CREDIT-" + Date.now();
+
+await creditWalletIdempotent(
+  uid,
+  txId,
+  amountKobo,
+  {
+    reason: "admin_credit",
+    admin: req.admin.uid,
+  }
+);
+
+await createAdminLog({
+  action: "CREDIT_WALLET",
+  adminUid: req.admin.uid,
+  adminEmail: req.admin.email,
+  targetUser: uid,
+  details: `₦${amount} credited`,
+});
+
+return res.json({
+  success: true,
+  message: "Wallet credited successfully",
+});
+
+} catch (e) {
+
+console.error(e);
+
+return res.status(500).json({
+  error: e.message,
+});
+
+}
+};
+// =======Debit User Wallet==========
+exports.debitUserWallet = async (req, res) => {
+try {
+
+const { uid, amount } = req.body;
+
+if (!uid || !amount) {
+  return res.status(400).json({
+    error: "uid and amount required",
+  });
+}
+
+const amountKobo =
+  Number(amount) * 100;
+
+const txId =
+  "ADMIN-DEBIT-" + Date.now();
+
+const result =
+  await debitWallet(
+    uid,
+    txId,
+    amountKobo,
+    {
+      reason: "admin_debit",
+      admin: req.admin.uid,
+    }
+  );
+
+if (!result.success) {
+  return res.status(400).json({
+    error:
+      result.reason ||
+      "Debit failed",
+  });
+}
+
+await createAdminLog({
+  action: "DEBIT_WALLET",
+  adminUid: req.admin.uid,
+  adminEmail: req.admin.email,
+  targetUser: uid,
+  details: `₦${amount} debited`,
+});
+
+return res.json({
+  success: true,
+  message:
+    "Wallet debited successfully",
+});
+
+} catch (e) {
+
+console.error(e);
+
+return res.status(500).json({
+  error: e.message,
+});
+
+}
 };
