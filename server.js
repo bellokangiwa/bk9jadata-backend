@@ -72,6 +72,7 @@ const vtuRoutes = require("./routes/vtuRoutes");
 const dvaRoutes = require("./routes/dvaRoutes");
 const dataCatalogRoutes = require("./routes/dataCatalogRoutes");
 const adminRoutes = require("./routes/adminRoutes");
+const userRoutes = require("./routes/userRoutes");
 // -----------------------------
 // 5. Mount routes
 // -----------------------------
@@ -80,7 +81,7 @@ app.use("/api/dva", dvaRoutes);
 app.use("/api/wallet", walletRoutes);
 app.use("/api/data", dataCatalogRoutes);
 app.use("/api/admin", adminRoutes);
-
+app.use("/api/user", userRoutes);
 // -----------------------------
 // 6. Health Check
 // -----------------------------

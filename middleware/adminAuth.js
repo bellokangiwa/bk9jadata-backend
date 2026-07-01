@@ -1,11 +1,6 @@
 // middleware/adminAuth.js
 const admin = require("firebase-admin");
 
-const ADMIN_UIDS = [
-  "ADMIN_FIREBASE_UID_1",
-  "ADMIN_FIREBASE_UID_2",
-];
-
 async function verifyAdmin(req, res, next) {
   const authHeader = req.headers.authorization || "";
   if (!authHeader.startsWith("Bearer ")) {
@@ -16,14 +11,28 @@ async function verifyAdmin(req, res, next) {
 
   try {
     const decoded = await admin.auth().verifyIdToken(token);
+    const uid = decoded.uid;
 
-    if (!ADMIN_UIDS.includes(decoded.uid)) {
+    // 🔍 Check Firestore for admin record
+    const adminDoc = await admin.firestore()
+      .collection("admins")
+      .doc(uid)
+      .get();
+
+    if (!adminDoc.exists) {
       return res.status(403).json({ error: "Not an admin" });
     }
 
-    req.admin = decoded;
+    // ✅ Attach admin info to request
+    req.admin = {
+      uid,
+      email: decoded.email,
+      ...adminDoc.data(),
+    };
+
     next();
   } catch (err) {
+    console.error("Admin verification error:", err);
     return res.status(401).json({ error: "Invalid admin token" });
   }
 }
