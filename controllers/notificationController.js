@@ -53,7 +53,7 @@ exports.sendNotification = async (req, res) => {
   targetUser: targetUser || "",
   targetUsers: targetUsers || [],
   publishAt: publishAt || new Date(),
-  createdBy: req.admin?.email || "Admin",
+  createdBy: req.auth?.email || "Admin",
 });
 
 // ===== SAVE ADMIN ACTIVITY =====
