@@ -77,7 +77,14 @@ if (!/^\d{6}$/.test(newPassword)) {
 }
 
 await admin.auth().updateUser(uid, {
-  password: newPassword,
+    password: newPassword,
+});
+
+await admin.firestore()
+.collection("users")
+.doc(uid)
+.update({
+    mustChangePassword: true,
 });
 
 await admin.auth().revokeRefreshTokens(uid);
