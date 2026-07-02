@@ -83,7 +83,7 @@ app.use("/api/wallet", walletRoutes);
 app.use("/api/data", dataCatalogRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/user", userRoutes);
-app.use("/api/notifications", notificationRoutes);
+app.use("/api", notificationRoutes);
 // -----------------------------
 // 6. Health Check
 // -----------------------------
