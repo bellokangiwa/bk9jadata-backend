@@ -91,6 +91,14 @@ const notificationSchema = new mongoose.Schema(
       type: String,
       default: "Admin",
     },
+
+    // ==========================================
+    // Users who have read this notification
+    // ==========================================
+    readBy: {
+      type: [String],
+      default: [],
+    },
   },
   {
     timestamps: true,

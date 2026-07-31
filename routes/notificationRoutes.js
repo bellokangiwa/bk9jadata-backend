@@ -28,5 +28,20 @@ router.get(
   verifyUser,
   notificationController.getNotifications
 );
-
+// ==========================================
+// USER - GET UNREAD COUNT
+// ==========================================
+router.get(
+  "/notifications/unread-count",
+  verifyUser,
+  notificationController.getUnreadCount
+);
+// ==========================================
+// USER - MARK AS READ
+// ==========================================
+router.post(
+  "/notifications/read/:id",
+  verifyUser,
+  notificationController.markAsRead
+);
 module.exports = router;

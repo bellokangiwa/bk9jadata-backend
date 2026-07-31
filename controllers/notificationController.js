@@ -124,3 +124,88 @@ exports.getNotifications = async (req, res) => {
 
   }
 };
+// ===========================================
+// GET UNREAD NOTIFICATION COUNT
+// ===========================================
+exports.getUnreadCount = async (req, res) => {
+  try {
+    const uid = req.auth.uid;
+
+    const count = await Notification.countDocuments({
+      active: true,
+      publishAt: { $lte: new Date() },
+
+      $or: [
+        { target: "all" },
+        {
+          target: "single",
+          targetUser: uid,
+        },
+        {
+          target: "selected",
+          targetUsers: uid,
+        },
+      ],
+
+      // User has NOT read this notification
+      readBy: {
+        $ne: uid,
+      },
+    });
+
+    return res.json({
+      success: true,
+      count,
+    });
+
+  } catch (error) {
+
+    console.error("Unread count error:", error);
+
+    return res.status(500).json({
+      success: false,
+      error: "Internal server error.",
+    });
+
+  }
+};
+// ===========================================
+// MARK NOTIFICATION AS READ
+// ===========================================
+exports.markAsRead = async (req, res) => {
+  try {
+
+    const uid = req.auth.uid;
+    const notificationId = req.params.id;
+
+    const notification = await Notification.findById(notificationId);
+
+    if (!notification) {
+      return res.status(404).json({
+        success: false,
+        error: "Notification not found.",
+      });
+    }
+
+    // Prevent duplicate entries
+    if (!notification.readBy.includes(uid)) {
+      notification.readBy.push(uid);
+      await notification.save();
+    }
+
+    return res.json({
+      success: true,
+      message: "Notification marked as read.",
+    });
+
+  } catch (error) {
+
+    console.error("Mark as read error:", error);
+
+    return res.status(500).json({
+      success: false,
+      error: "Internal server error.",
+    });
+
+  }
+};
