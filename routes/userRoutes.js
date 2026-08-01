@@ -11,5 +11,10 @@ router.post(
   verifyUser,
   userController.changePassword
 );
+router.post(
+  "/save-fcm-token",
+  verifyUser,
+  userController.saveFcmToken
+);
 
 module.exports = router;

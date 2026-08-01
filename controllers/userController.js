@@ -1,5 +1,4 @@
 const admin = require("firebase-admin");
-
 // =========================
 // USER CHANGE PASSWORD
 // =========================
@@ -50,4 +49,52 @@ exports.changePassword = async (req, res) => {
     });
 
   }
+};
+
+//=========================================
+// SAVE FCM TOKEN
+//=========================================
+exports.saveFcmToken = async (req, res) => {
+
+  try {
+
+    const uid = req.auth.uid;
+
+    const { token } = req.body;
+
+    if (!token) {
+      return res.status(400).json({
+        success: false,
+        error: "Token is required",
+      });
+    }
+
+    await admin
+      .firestore()
+      .collection("users")
+      .doc(uid)
+      .set(
+        {
+          fcmToken: token,
+          lastTokenUpdate: admin.firestore.FieldValue.serverTimestamp(),
+        },
+        { merge: true }
+      );
+
+    return res.json({
+      success: true,
+      message: "FCM token saved successfully",
+    });
+
+  } catch (e) {
+
+    console.error(e);
+
+    return res.status(500).json({
+      success: false,
+      error: "Internal server error",
+    });
+
+  }
+
 };

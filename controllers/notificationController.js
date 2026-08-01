@@ -1,5 +1,6 @@
 const Notification = require("../models/notification");
 const createAdminLog = require("../utils/adminLog");
+const admin = require("firebase-admin");
 // ===========================================
 // SEND NOTIFICATION (ADMIN)
 // ===========================================
@@ -53,10 +54,164 @@ exports.sendNotification = async (req, res) => {
   targetUser: targetUser || "",
   targetUsers: targetUsers || [],
   publishAt: publishAt || new Date(),
-  createdBy: req.auth?.email || "Admin",
+  createdBy: req.admin?.email || "Admin",
 });
+//--------------------------------------------------
+// SEND PUSH NOTIFICATION
+//--------------------------------------------------
 
-// ===== SAVE ADMIN ACTIVITY =====
+const tokens = [];
+
+//==================================================
+// SEND TO ALL USERS
+//==================================================
+if (target === "all") {
+
+  const usersSnapshot = await admin
+    .firestore()
+    .collection("users")
+    .get();
+
+  usersSnapshot.forEach((doc) => {
+    const data = doc.data();
+
+    if (data.fcmToken) {
+      tokens.push(data.fcmToken);
+    }
+  });
+
+}
+
+//==================================================
+// SEND TO SINGLE USER
+//==================================================
+else if (target === "single") {
+
+  const userDoc = await admin
+    .firestore()
+    .collection("users")
+    .doc(targetUser)
+    .get();
+
+  if (userDoc.exists) {
+
+    const data = userDoc.data();
+
+    if (data.fcmToken) {
+      tokens.push(data.fcmToken);
+    }
+
+  }
+
+}
+
+//==================================================
+// SEND TO SELECTED USERS
+//==================================================
+else if (target === "selected") {
+
+  for (const uid of targetUsers) {
+
+    const userDoc = await admin
+      .firestore()
+      .collection("users")
+      .doc(uid)
+      .get();
+
+    if (userDoc.exists) {
+
+      const data = userDoc.data();
+
+      if (data.fcmToken) {
+        tokens.push(data.fcmToken);
+      }
+
+    }
+
+  }
+
+}
+
+//==================================================
+// REMOVE DUPLICATE TOKENS
+//==================================================
+const uniqueTokens = [...new Set(tokens)];
+
+console.log(`Collected ${uniqueTokens.length} FCM token(s).`);
+
+//==================================================
+// SEND PUSH NOTIFICATION
+//==================================================
+if (uniqueTokens.length > 0) {
+
+  try {
+
+    const response = await admin.messaging().sendEachForMulticast({
+
+      tokens: uniqueTokens,
+
+      notification: {
+        title: title,
+        body: message,
+      },
+
+      webpush: {
+        notification: {
+          title: title,
+          body: message,
+          icon: "https://www.bk9jadatasub.com/icons/Icon-192.png",
+          badge: "https://www.bk9jadatasub.com/icons/Icon-192.png",
+          image: image || undefined,
+        },
+
+        fcmOptions: {
+          link: "https://www.bk9jadatasub.com",
+        },
+      },
+
+      data: {
+        type: type,
+        priority: priority,
+        click_action: "FLUTTER_NOTIFICATION_CLICK",
+      },
+
+    });
+
+    console.log(
+      `Push Notification: ${response.successCount} success, ${response.failureCount} failed`
+    );
+
+    //------------------------------------------------
+    // REMOVE INVALID TOKENS
+    //------------------------------------------------
+
+    response.responses.forEach((result, index) => {
+
+      if (!result.success) {
+
+        console.log(
+          "Invalid Token:",
+          uniqueTokens[index]
+        );
+
+      }
+
+    });
+
+  } catch (err) {
+
+    console.error(
+      "FCM Send Error:",
+      err.message
+    );
+
+  }
+
+} else {
+
+  console.log("No FCM tokens found.");
+
+}// ===== SAVE ADMIN ACTIVITY =====
 await createAdminLog({
   action: "SEND_NOTIFICATION",
   adminUid: req.admin.uid,
