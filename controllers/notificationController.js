@@ -261,12 +261,16 @@ exports.getNotifications = async (req, res) => {
     }).sort({
       createdAt: -1,
     });
+const formattedNotifications = notifications.map((notification) => ({
+  ...notification.toObject(),
+  isRead: notification.readBy.includes(uid),
+}));
 
-    return res.json({
-      success: true,
-      count: notifications.length,
-      notifications,
-    });
+return res.json({
+  success: true,
+  count: formattedNotifications.length,
+  notifications: formattedNotifications,
+});
 
   } catch (error) {
 
