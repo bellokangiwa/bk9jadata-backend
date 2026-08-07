@@ -3,66 +3,84 @@ const path = require("path");
 const fs = require("fs");
 
 // ==========================================
-// PROFILE IMAGE UPLOAD DIRECTORY
+// CREATE UPLOAD FOLDER AUTOMATICALLY
 // ==========================================
 
-const uploadDirectory = path.join(
+const uploadDir = path.join(
   __dirname,
   "..",
   "uploads",
   "profile-images"
 );
 
-// Automatically create the folders if they don't exist
-if (!fs.existsSync(uploadDirectory)) {
-  fs.mkdirSync(uploadDirectory, {
+if (!fs.existsSync(uploadDir)) {
+  fs.mkdirSync(uploadDir, {
     recursive: true,
   });
 
-  console.log(
-    "Profile image upload directory created:",
-    uploadDirectory
-  );
+  console.log("Created upload directory:", uploadDir);
 }
 
 // ==========================================
-// MULTER STORAGE
+// STORAGE
 // ==========================================
 
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    cb(null, uploadDirectory);
+    cb(null, uploadDir);
   },
 
   filename: (req, file, cb) => {
+    const ext = path.extname(file.originalname).toLowerCase() || ".jpg";
+
     // One profile picture per Firebase user
-    cb(null, `${req.auth.uid}.jpg`);
+    cb(null, `${req.auth.uid}${ext}`);
   },
 });
 
 // ==========================================
-// ALLOW ONLY IMAGE FILES
+// IMAGE FILTER
 // ==========================================
 
 const fileFilter = (req, file, cb) => {
-  if (file.mimetype && file.mimetype.startsWith("image/")) {
-    cb(null, true);
-  } else {
-    cb(new Error("Only image files are allowed."));
+  console.log("====================================");
+  console.log("PROFILE IMAGE UPLOAD");
+  console.log("Original name:", file.originalname);
+  console.log("Mimetype:", file.mimetype);
+  console.log("Size:", file.size);
+  console.log("====================================");
+
+  // Accept normal browser image MIME types
+  const allowedMimeTypes = [
+    "image/jpeg",
+    "image/jpg",
+    "image/png",
+    "image/webp",
+    "image/gif",
+  ];
+
+  if (allowedMimeTypes.includes(file.mimetype)) {
+    return cb(null, true);
   }
+
+  return cb(
+    new Error(
+      `Only image files are allowed. Received: ${file.mimetype}`
+    ),
+    false
+  );
 };
 
 // ==========================================
-// MULTER CONFIGURATION
+// MULTER
 // ==========================================
 
 const upload = multer({
-  storage: storage,
-
-  fileFilter: fileFilter,
+  storage,
+  fileFilter,
 
   limits: {
-    fileSize: 3 * 1024 * 1024, // Maximum 3MB
+    fileSize: 3 * 1024 * 1024, // 3 MB
   },
 });
 
