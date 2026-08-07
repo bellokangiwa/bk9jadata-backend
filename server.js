@@ -9,6 +9,7 @@ const cors = require("cors");
 const fs = require("fs");
 const path = require("path");
 
+
 const connectDB = require("./config/db");
 const app = express();
 
@@ -57,7 +58,10 @@ app.use(
 // -----------------------------
 app.use(cors());
 app.use(express.json());
-
+app.use(
+  "/uploads",
+  express.static(path.join(__dirname, "uploads"))
+);
 // Log every request
 app.use((req, res, next) => {
   console.log("REQUEST:", req.method, req.path);
@@ -74,6 +78,7 @@ const dataCatalogRoutes = require("./routes/dataCatalogRoutes");
 const adminRoutes = require("./routes/adminRoutes");
 const userRoutes = require("./routes/userRoutes");
 const notificationRoutes = require("./routes/notificationRoutes");
+const profileRoutes = require("./routes/profileRoutes");
 // -----------------------------
 // 5. Mount routes
 // -----------------------------
@@ -84,6 +89,7 @@ app.use("/api/data", dataCatalogRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/user", userRoutes);
 app.use("/api", notificationRoutes);
+app.use("/api/profile", profileRoutes);
 // -----------------------------
 // 6. Health Check
 // -----------------------------
