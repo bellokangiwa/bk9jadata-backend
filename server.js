@@ -62,6 +62,7 @@ app.use(
   "/uploads",
   express.static(path.join(__dirname, "uploads"))
 );
+app.set("trust proxy", 1);
 // Log every request
 app.use((req, res, next) => {
   console.log("REQUEST:", req.method, req.path);
