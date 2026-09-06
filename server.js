@@ -43,7 +43,10 @@ try {
 } catch (error) {
   console.error("Firebase initialization failed:", error.message);
 }
-
+const { initializeKycServices } = require("./services/kycPricingService");
+initializeKycServices().catch((error) => {
+  console.error("KYC pricing initialization failed:", error);
+});
 // -----------------------------
 // 2. Paystack Webhook (MUST be before express.json())
 // -----------------------------
@@ -80,6 +83,8 @@ const adminRoutes = require("./routes/adminRoutes");
 const userRoutes = require("./routes/userRoutes");
 const notificationRoutes = require("./routes/notificationRoutes");
 const profileRoutes = require("./routes/profileRoutes");
+const techhubRoutes = require("./routes/techhubRoutes");
+const kycPricingRoutes = require("./routes/kycPricingRoutes");
 // -----------------------------
 // 5. Mount routes
 // -----------------------------
@@ -89,8 +94,10 @@ app.use("/api/wallet", walletRoutes);
 app.use("/api/data", dataCatalogRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/user", userRoutes);
+app.use("/api/techhub", techhubRoutes);
 app.use("/api", notificationRoutes);
 app.use("/api/profile", profileRoutes);
+app.use("/api/kyc-pricing", kycPricingRoutes);
 // -----------------------------
 // 6. Health Check
 // -----------------------------
