@@ -61,8 +61,9 @@ async function createKycTransaction({
 
       // TechHub provider cost
       provider_cost_kobo: providerCostKobo,
-      provider_cost_naira:
-        koboToNaira(providerCostKobo),
+      provider_cost_naira: koboToNaira(
+        providerCostKobo
+      ),
 
       // BK9JA profit
       profit_kobo: profitKobo,
@@ -173,14 +174,10 @@ async function executeKyc({
 
   // ========================================
   // 4. TECHHUB PROVIDER COST
-  //
-  // We are temporarily reading the existing
-  // Firestore "dojahCost" field so you don't
-  // need to migrate your pricing collection.
   // ========================================
 
   const providerCost =
-    Number(pricing.dojahCost);
+    Number(pricing.providerCost);
 
 
   // ========================================
@@ -203,7 +200,7 @@ async function executeKyc({
 
 
   // ========================================
-  // 6. VALIDATE PROVIDER COST
+  // 6. VALIDATE TECHHUB COST
   // ========================================
 
   if (
@@ -222,7 +219,23 @@ async function executeKyc({
 
 
   // ========================================
-  // 7. CONVERT TO KOBO
+  // 7. CHECK PRICE VS PROVIDER COST
+  // ========================================
+
+  if (userPrice < providerCost) {
+    const error = new Error(
+      "Customer price cannot be lower than TechHub provider cost"
+    );
+
+    error.code =
+      "INVALID_PROFIT_MARGIN";
+
+    throw error;
+  }
+
+
+  // ========================================
+  // 8. CONVERT TO KOBO
   // ========================================
 
   const amountKobo =
@@ -233,7 +246,7 @@ async function executeKyc({
 
 
   // ========================================
-  // 8. CALCULATE PROFIT
+  // 9. CALCULATE PROFIT
   // ========================================
 
   const profitKobo =
@@ -241,7 +254,7 @@ async function executeKyc({
 
 
   // ========================================
-  // 9. GENERATE REFERENCE
+  // 10. GENERATE REFERENCE
   // ========================================
 
   const reference =
@@ -249,7 +262,7 @@ async function executeKyc({
 
 
   // ========================================
-  // 10. DEBIT CUSTOMER WALLET
+  // 11. DEBIT CUSTOMER WALLET
   // ========================================
 
   const debitResult =
@@ -259,14 +272,20 @@ async function executeKyc({
       amountKobo,
       {
         type: "kyc",
+
         service,
-        serviceName: pricing.name,
 
-        kycReference: reference,
+        serviceName:
+          pricing.name,
 
-        provider: "techhub",
+        kycReference:
+          reference,
 
-        amount_naira: userPrice,
+        provider:
+          "techhub",
+
+        amount_naira:
+          userPrice,
 
         provider_cost_naira:
           providerCost,
@@ -278,7 +297,7 @@ async function executeKyc({
 
 
   // ========================================
-  // 11. CHECK DEBIT RESULT
+  // 12. CHECK DEBIT RESULT
   // ========================================
 
   if (!debitResult.success) {
@@ -304,14 +323,18 @@ async function executeKyc({
 
 
   // ========================================
-  // 12. CREATE KYC TRANSACTION
+  // 13. CREATE KYC TRANSACTION
   // ========================================
 
   await createKycTransaction({
     reference,
+
     userId,
+
     service,
-    serviceName: pricing.name,
+
+    serviceName:
+      pricing.name,
 
     amountKobo,
 
@@ -322,7 +345,7 @@ async function executeKyc({
 
 
   // ========================================
-  // 13. CALL TECHHUB
+  // 14. CALL TECHHUB
   // ========================================
 
   try {
@@ -332,7 +355,7 @@ async function executeKyc({
 
 
     // ======================================
-    // 14. MARK SUCCESSFUL
+    // 15. MARK SUCCESSFUL
     // ======================================
 
     await updateKycTransaction(
@@ -340,7 +363,8 @@ async function executeKyc({
       {
         status: "success",
 
-        provider: "techhub",
+        provider:
+          "techhub",
 
         provider_response:
           result,
@@ -353,7 +377,7 @@ async function executeKyc({
 
 
     // ======================================
-    // 15. RETURN RESULT
+    // 16. RETURN RESULT
     // ======================================
 
     return {
@@ -369,7 +393,8 @@ async function executeKyc({
       amount_naira:
         userPrice,
 
-      provider: "techhub",
+      provider:
+        "techhub",
 
       provider_cost_naira:
         providerCost,
@@ -377,7 +402,8 @@ async function executeKyc({
       profit_naira:
         koboToNaira(profitKobo),
 
-      data: result,
+      data:
+        result,
     };
 
   } catch (error) {
@@ -402,7 +428,8 @@ async function executeKyc({
       {
         status: "failed",
 
-        provider: "techhub",
+        provider:
+          "techhub",
 
         error:
           error.response?.data ||
@@ -423,10 +450,14 @@ async function executeKyc({
 
       await creditWalletIdempotent(
         userId,
+
         refundReference,
+
         amountKobo,
+
         {
-          type: "kyc_refund",
+          type:
+            "kyc_refund",
 
           service,
 
@@ -436,7 +467,8 @@ async function executeKyc({
           kycReference:
             reference,
 
-          provider: "techhub",
+          provider:
+            "techhub",
 
           reason:
             "TechHub verification failed",
@@ -451,7 +483,8 @@ async function executeKyc({
       await updateKycTransaction(
         reference,
         {
-          status: "refunded",
+          status:
+            "refunded",
 
           refund_reference:
             refundReference,
@@ -483,7 +516,8 @@ async function executeKyc({
       await updateKycTransaction(
         reference,
         {
-          status: "refund_failed",
+          status:
+            "refund_failed",
 
           refund_error:
             refundError.message,
@@ -499,7 +533,6 @@ async function executeKyc({
     throw error;
   }
 }
-
 
 // ========================================
 // EXPORT

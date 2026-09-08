@@ -11,7 +11,7 @@ const TECHHUB_API_KEY = process.env.TECHHUB_API_KEY;
 
 
 // ==========================================
-// COMMON TECHHUB REQUEST
+// COMMON TECHHUB POST REQUEST
 // ==========================================
 
 const techhubPost = async (endpoint, payload = {}) => {
@@ -47,54 +47,47 @@ const techhubPost = async (endpoint, payload = {}) => {
 };
 
 
-// ==========================================
+// ==========================================================
 // NIN BY NIN
-// ==========================================
+// ==========================================================
 
-const lookupNIN = async (nin) => {
+// 1. NIN BY NIN
+const lookupNINByNIN = async (nin) => {
   return await techhubPost("nin_by_nin.php", {
     nin,
   });
 };
 
 
-// ==========================================
-// NIN STANDARD SLIP
-// ==========================================
-
-const lookupNINSlip = async (nin) => {
+// 2. NIN STANDARD SLIP BY NIN
+const lookupNINStandardSlipByNIN = async (nin) => {
   return await techhubPost("nin_standard_slip.php", {
     nin,
   });
 };
 
 
-// ==========================================
-// NIN REGULAR SLIP
-// ==========================================
-
-const lookupNINRegularSlip = async (nin) => {
+// 3. NIN REGULAR SLIP BY NIN
+const lookupNINRegularSlipByNIN = async (nin) => {
   return await techhubPost("nin_regular_slip.php", {
     nin,
   });
 };
 
 
-// ==========================================
-// VNIN SLIP
-// ==========================================
-
-const lookupVNINSlip = async (nin) => {
+// 4. VNIN SLIP BY NIN
+const lookupVNINSlipByNIN = async (nin) => {
   return await techhubPost("vnin_slip.php", {
     nin,
   });
 };
 
 
-// ==========================================
-// NIN BY PHONE - PREMIUM
-// ==========================================
+// ==========================================================
+// NIN WITH PHONE
+// ==========================================================
 
+// 1. NIN BY PHONE - PREMIUM
 const lookupNINByPhonePremium = async (phone) => {
   return await techhubPost("nin_by_phone_premium.php", {
     phone,
@@ -102,10 +95,7 @@ const lookupNINByPhonePremium = async (phone) => {
 };
 
 
-// ==========================================
-// NIN BY PHONE - STANDARD
-// ==========================================
-
+// 2. NIN BY PHONE - STANDARD
 const lookupNINByPhoneStandard = async (phone) => {
   return await techhubPost("nin_by_phone_standard.php", {
     phone,
@@ -113,10 +103,7 @@ const lookupNINByPhoneStandard = async (phone) => {
 };
 
 
-// ==========================================
-// NIN BY PHONE - REGULAR
-// ==========================================
-
+// 3. NIN BY PHONE - REGULAR
 const lookupNINByPhoneRegular = async (phone) => {
   return await techhubPost("nin_by_phone_regular.php", {
     phone,
@@ -124,10 +111,25 @@ const lookupNINByPhoneRegular = async (phone) => {
 };
 
 
-// ==========================================
+// ==========================================================
 // NIN BY DEMO
-// ==========================================
+// ==========================================================
 
+// Common demographic parameters:
+//
+// firstname
+// lastname
+// dob
+// gender
+//
+// Example:
+// firstname: "Bello"
+// lastname: "Kangiwa"
+// dob: "01-01-2000"
+// gender: "Male"
+
+
+// 1. NIN BY DEMO
 const lookupNINByDemo = async (
   firstname,
   lastname,
@@ -143,10 +145,59 @@ const lookupNINByDemo = async (
 };
 
 
-// ==========================================
-// BVN PREMIUM SLIP
-// ==========================================
+// 2. NIN STANDARD SLIP BY DEMO
+const lookupNINStandardSlipByDemo = async (
+  firstname,
+  lastname,
+  dob,
+  gender
+) => {
+  return await techhubPost("nin_standard_slip.php", {
+    firstname,
+    lastname,
+    dob,
+    gender,
+  });
+};
 
+
+// 3. NIN REGULAR SLIP BY DEMO
+const lookupNINRegularSlipByDemo = async (
+  firstname,
+  lastname,
+  dob,
+  gender
+) => {
+  return await techhubPost("nin_regular_slip.php", {
+    firstname,
+    lastname,
+    dob,
+    gender,
+  });
+};
+
+
+// 4. VNIN SLIP BY DEMO
+const lookupVNINSlipByDemo = async (
+  firstname,
+  lastname,
+  dob,
+  gender
+) => {
+  return await techhubPost("vnin_slip.php", {
+    firstname,
+    lastname,
+    dob,
+    gender,
+  });
+};
+
+
+// ==========================================================
+// BVN SERVICES
+// ==========================================================
+
+// 1. BVN PREMIUM SLIP
 const lookupBVNPremiumSlip = async (bvn) => {
   return await techhubPost("bvn_premium_slip.php", {
     bvn,
@@ -154,10 +205,7 @@ const lookupBVNPremiumSlip = async (bvn) => {
 };
 
 
-// ==========================================
-// BVN FULL DETAILS SLIP
-// ==========================================
-
+// 2. BVN FULL DETAILS SLIP
 const lookupBVNFull = async (bvn) => {
   return await techhubPost("bvn_full_details_slip.php", {
     bvn,
@@ -165,9 +213,9 @@ const lookupBVNFull = async (bvn) => {
 };
 
 
-// ==========================================
+// ==========================================================
 // NIN VALIDATION / TRACKING
-// ==========================================
+// ==========================================================
 
 const validateNINTracking = async (ticketId) => {
   try {
@@ -198,24 +246,52 @@ const validateNINTracking = async (ticketId) => {
 };
 
 
-// ==========================================
+// ==========================================================
 // EXPORT
-// ==========================================
+// ==========================================================
 
 module.exports = {
-  lookupNIN,
-  lookupNINSlip,
-  lookupNINRegularSlip,
-  lookupVNINSlip,
+
+  // ------------------------------------------
+  // NIN BY NIN
+  // ------------------------------------------
+
+  lookupNINByNIN,
+  lookupNINStandardSlipByNIN,
+  lookupNINRegularSlipByNIN,
+  lookupVNINSlipByNIN,
+
+
+  // ------------------------------------------
+  // NIN WITH PHONE
+  // ------------------------------------------
 
   lookupNINByPhonePremium,
   lookupNINByPhoneStandard,
   lookupNINByPhoneRegular,
 
+
+  // ------------------------------------------
+  // NIN BY DEMO
+  // ------------------------------------------
+
   lookupNINByDemo,
+  lookupNINStandardSlipByDemo,
+  lookupNINRegularSlipByDemo,
+  lookupVNINSlipByDemo,
+
+
+  // ------------------------------------------
+  // BVN
+  // ------------------------------------------
 
   lookupBVNPremiumSlip,
   lookupBVNFull,
+
+
+  // ------------------------------------------
+  // NIN VALIDATION
+  // ------------------------------------------
 
   validateNINTracking,
 };
