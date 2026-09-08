@@ -355,26 +355,24 @@ async function executeKyc({
 
 
     // ======================================
-    // 15. MARK SUCCESSFUL
-    // ======================================
+// 15. MARK SUCCESSFUL
+// ======================================
 
-    await updateKycTransaction(
-      reference,
-      {
-        status: "success",
+await updateKycTransaction(
+  reference,
+  {
+    status: "success",
 
-        provider:
-          "techhub",
+    provider: "techhub",
 
-        provider_response:
-          result,
+    provider_response:
+      JSON.parse(JSON.stringify(result)),
 
-        completedAt:
-          admin.firestore.FieldValue
-            .serverTimestamp(),
-      }
-    );
-
+    completedAt:
+      admin.firestore.FieldValue
+        .serverTimestamp(),
+  }
+);
 
     // ======================================
     // 16. RETURN RESULT
