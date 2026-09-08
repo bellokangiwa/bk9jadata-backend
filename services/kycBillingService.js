@@ -366,14 +366,12 @@ await updateKycTransaction(
     provider: "techhub",
 
     provider_response:
-      JSON.parse(JSON.stringify(result)),
+      JSON.stringify(result),
 
     completedAt:
-      admin.firestore.FieldValue
-        .serverTimestamp(),
+      admin.firestore.FieldValue.serverTimestamp(),
   }
 );
-
     // ======================================
     // 16. RETURN RESULT
     // ======================================
