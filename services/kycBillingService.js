@@ -362,11 +362,21 @@ async function executeKyc({
 // Keep the original `result` untouched so Flutter still receives
 // the PDF in `data`.
 const providerResponseForFirestore = {
-  ...result,
+  status: result?.status ?? null,
+  response_code: result?.response_code ?? null,
+  message: result?.message ?? null,
 };
-
-delete providerResponseForFirestore.pdf_base64;
-
+if (result?.user_data) {
+  providerResponseForFirestore.user_data = {
+    first_name: result.user_data.first_name ?? null,
+    last_name: result.user_data.last_name ?? null,
+    middle_name: result.user_data.middle_name ?? null,
+    gender: result.user_data.gender ?? null,
+    date_of_birth: result.user_data.date_of_birth ?? null,
+    phone_number: result.user_data.phone_number ?? null,
+    address: result.user_data.address ?? null,
+  };
+}
 await updateKycTransaction(
   reference,
   {
@@ -381,7 +391,8 @@ await updateKycTransaction(
       admin.firestore.FieldValue
         .serverTimestamp(),
   }
-);    // ======================================
+); 
+   // ======================================
     // 16. RETURN RESULT
     // ======================================
 
