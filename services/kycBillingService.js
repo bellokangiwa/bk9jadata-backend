@@ -358,6 +358,15 @@ async function executeKyc({
 // 15. MARK SUCCESSFUL
 // ======================================
 
+// Remove the large PDF from the copy saved in Firestore.
+// Keep the original `result` untouched so Flutter still receives
+// the PDF in `data`.
+const providerResponseForFirestore = {
+  ...result,
+};
+
+delete providerResponseForFirestore.pdf_base64;
+
 await updateKycTransaction(
   reference,
   {
@@ -366,13 +375,13 @@ await updateKycTransaction(
     provider: "techhub",
 
     provider_response:
-      JSON.stringify(result),
+      providerResponseForFirestore,
 
     completedAt:
-      admin.firestore.FieldValue.serverTimestamp(),
+      admin.firestore.FieldValue
+        .serverTimestamp(),
   }
-);
-    // ======================================
+);    // ======================================
     // 16. RETURN RESULT
     // ======================================
 
