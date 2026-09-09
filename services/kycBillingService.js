@@ -133,9 +133,14 @@ async function executeKyc({
   // 1. GET CURRENT KYC PRICING
   // ========================================
 
-  const pricing =
-    await getKycService(service);
+const pricing = await getKycService(service);
 
+console.log("========================================");
+console.log("KYC SERVICE REQUEST:", service);
+console.log("KYC PRICING FROM FIRESTORE:", pricing);
+console.log("KYC isActive VALUE:", pricing?.isActive);
+console.log("KYC isActive TYPE:", typeof pricing?.isActive);
+console.log("========================================");
   if (!pricing) {
     const error = new Error(
       `KYC service "${service}" not found`
