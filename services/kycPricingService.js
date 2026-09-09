@@ -146,30 +146,31 @@ async function initializeKycServices() {
   for (const service of DEFAULT_KYC_SERVICES) {
     const ref = kycServicesCol().doc(service.service);
 
-    const snap = await ref.get();
-
-    if (!snap.exists) {
-      batch.set(ref, {
+    batch.set(
+      ref,
+      {
         ...service,
 
         provider: "techhub",
 
-        createdAt:
-          admin.firestore.FieldValue.serverTimestamp(),
-
         updatedAt:
           admin.firestore.FieldValue.serverTimestamp(),
-      });
-    }
+
+        createdAt:
+          admin.firestore.FieldValue.serverTimestamp(),
+      },
+      {
+        merge: true,
+      }
+    );
   }
 
   await batch.commit();
 
   console.log(
-    "TechHub KYC pricing initialized successfully"
+    "TechHub KYC pricing initialized/updated successfully"
   );
 }
-
 
 // ==========================================
 // GET ALL KYC SERVICES
