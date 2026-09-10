@@ -88,25 +88,34 @@ const lookupVNINSlipByNIN = async (nin) => {
 // ==========================================================
 
 // 1. NIN BY PHONE - PREMIUM
+// TechHub currently expects BOTH phone and the legacy nin key
+// on the Premium phone endpoint.
 const lookupNINByPhonePremium = async (phone) => {
   return await techhubPost("nin_by_phone_premium.php", {
     phone,
+    nin: phone,
   });
 };
 
 
 // 2. NIN BY PHONE - STANDARD
+// Send both values to match the provider's current
+// phone-request compatibility.
 const lookupNINByPhoneStandard = async (phone) => {
   return await techhubPost("nin_by_phone_standard.php", {
     phone,
+    nin: phone,
   });
 };
 
 
 // 3. NIN BY PHONE - REGULAR
+// The live endpoint has also shown that it expects the
+// legacy nin parameter, so we include it here as well.
 const lookupNINByPhoneRegular = async (phone) => {
   return await techhubPost("nin_by_phone_regular.php", {
     phone,
+    nin: phone,
   });
 };
 
@@ -123,6 +132,7 @@ const lookupNINByPhoneRegular = async (phone) => {
 // gender
 //
 // Example:
+//
 // firstname: "Bello"
 // lastname: "Kangiwa"
 // dob: "01-01-2000"
@@ -191,7 +201,6 @@ const lookupVNINSlipByDemo = async (
     gender,
   });
 };
-
 
 // ==========================================================
 // BVN SERVICES
