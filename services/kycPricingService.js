@@ -56,7 +56,7 @@ const DEFAULT_KYC_SERVICES = [
     service: "nin_phone_premium",
     name: "NIN by Phone Premium",
     providerCost: 130,
-    userPrice: 200,
+    userPrice: 150,
     isActive: true,
   },
 
@@ -64,7 +64,7 @@ const DEFAULT_KYC_SERVICES = [
     service: "nin_phone_standard",
     name: "NIN by Phone Standard",
     providerCost: 130,
-    userPrice: 200,
+    userPrice: 150,
     isActive: true,
   },
 
@@ -72,7 +72,7 @@ const DEFAULT_KYC_SERVICES = [
     service: "nin_phone_regular",
     name: "NIN by Phone Regular",
     providerCost: 130,
-    userPrice: 200,
+    userPrice: 150,
     isActive: true,
   },
 

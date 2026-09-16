@@ -69,6 +69,33 @@ module.exports = [
     network: "AIRTEL",
     provider: "SMEPLUG",
     category: "AWOOF",
+    planType: "DAILY",
+    name: "3.2GB Awoof 3Days",
+    apiCode: "448",
+    smeplugNetworkId: 2,
+    smeplugPlanId: 409,
+    costPrice: 500,
+    sellingPrice: 550,
+    status: "active"
+  },
+  {
+    network: "AIRTEL",
+    provider: "SMEPLUG",
+    category: "AWOOF",
+    planType: "DAILY",
+    name: "6.5GB Awoof 7Days",
+    apiCode: "449",
+    smeplugNetworkId: 2,
+    smeplugPlanId: 409,
+    costPrice: 1000,
+    sellingPrice: 1100,
+    status: "active"
+  },
+
+  {
+    network: "AIRTEL",
+    provider: "SMEPLUG",
+    category: "AWOOF",
     planType: "WEEKLY",
     name: "5GB Awoof Weekly",
     apiCode: "410",

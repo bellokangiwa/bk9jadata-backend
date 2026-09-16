@@ -105,7 +105,7 @@ module.exports = [
     smeplugNetworkId: 1,
     smeplugPlanId: 423,
     costPrice: 300,
-    sellingPrice: 350,
+    sellingPrice: 320,
     status: "active"
   },
   {
@@ -118,7 +118,7 @@ module.exports = [
     smeplugNetworkId: 1,
     smeplugPlanId: 424,
     costPrice: 420,
-    sellingPrice: 450,
+    sellingPrice: 430,
     status: "active"
   },
   {
