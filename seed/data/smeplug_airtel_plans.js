@@ -73,7 +73,7 @@ module.exports = [
     name: "3.2GB Awoof 3Days",
     apiCode: "448",
     smeplugNetworkId: 2,
-    smeplugPlanId: 409,
+    smeplugPlanId: 448,
     costPrice: 500,
     sellingPrice: 550,
     status: "active"

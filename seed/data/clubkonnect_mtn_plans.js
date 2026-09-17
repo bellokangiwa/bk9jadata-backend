@@ -98,10 +98,10 @@ module.exports = [
     provider: "CLUBKONNECT",
     category: "SME",
     planType: "MONTHLY",
-    name: "500MB MONTHLY SME ",
+    name: "500MB Monthly SME ",
     dataValue: 500.00,
     costPrice: 307.00,
-    sellingPrice: 320,
+    sellingPrice: 350,
   },
   {
     network: "MTN",

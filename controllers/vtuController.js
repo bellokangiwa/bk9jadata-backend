@@ -158,160 +158,467 @@ if (amount < 50) {
 };
 // ================== BUY DATA ==================
 exports.buyData = async (req, res) => {
+
+  let uid;
+  let requestId;
+  let amountKobo = 0;
+  let walletDebited = false;
+
   try {
-    const uid = req.auth?.uid;
-    if (!uid) return res.status(401).json({ error: "Unauthorized" });
+
+    // ==================================================
+    // 1. AUTHENTICATION
+    // ==================================================
+
+    uid = req.auth?.uid;
+
+    if (!uid) {
+      return res.status(401).json({
+        status: false,
+        error: "Unauthorized",
+      });
+    }
+
+    // ==================================================
+    // 2. INPUT
+    // ==================================================
 
     const { planId, phone } = req.body;
+
     if (!planId || !phone) {
-      return res.status(400).json({ error: "planId and phone are required" });
+      return res.status(400).json({
+        status: false,
+        error: "planId and phone are required",
+      });
     }
+
+    // ==================================================
+    // 3. GET DATA PLAN
+    // ==================================================
 
     const plan = await DataPlan.findById(planId);
+
     if (!plan || plan.status !== "active") {
-      return res.status(404).json({ error: "Data plan not available" });
+      return res.status(404).json({
+        status: false,
+        error: "Data plan not available",
+      });
     }
 
-    const requestId = generateRequestID();
-    const amountKobo = Math.round(plan.sellingPrice * 100);
+    // ==================================================
+    // 4. GENERATE ONE REQUEST ID
+    // ==================================================
 
-    // ================= 1️⃣ DEBIT WALLET FIRST =================
+    requestId = generateRequestID();
+
+    amountKobo = Math.round(
+      Number(plan.sellingPrice) * 100
+    );
+
+    // ==================================================
+    // 5. DEBIT USER WALLET
+    // ==================================================
+
     const debitResult = await debitWallet(
       uid,
       requestId,
       amountKobo,
-      { purpose: "buy_data", planId }
+      {
+        purpose: "buy_data",
+        planId: plan._id.toString(),
+      }
     );
 
     if (!debitResult.success) {
+
       return res.status(400).json({
+        status: false,
         error: "Insufficient wallet balance",
       });
     }
 
-    // ================= 2️⃣ CALL PROVIDER =================
+    walletDebited = true;
+
+    console.log(
+      "DATA WALLET DEBIT SUCCESS:",
+      {
+        uid,
+        requestId,
+        amountKobo,
+        provider: plan.provider,
+      }
+    );
+
+    // ==================================================
+    // 6. CALL PROVIDER
+    // ==================================================
+
     let providerResponse;
 
     try {
-      if (plan.provider === "CLUBKONNECT") {
 
-        const mappedNetwork = clubKonnectNetworkMap[plan.network];
+      // ==================================================
+      // CLUBKONNECT
+      // ==================================================
+
+      if (
+        String(plan.provider).toUpperCase() ===
+        "CLUBKONNECT"
+      ) {
+
+        const mappedNetwork =
+          clubKonnectNetworkMap[
+            String(plan.network).toUpperCase()
+          ];
+
         if (!mappedNetwork) {
-          // Refund before returning
+
           await creditWalletIdempotent(
             uid,
             "REFUND-" + requestId,
             amountKobo,
-            { reason: "invalid_network_mapping" }
+            {
+              reason: "invalid_network_mapping",
+            }
           );
 
           return res.status(400).json({
+            status: false,
             error: "Invalid network for ClubKonnect",
           });
         }
 
-        providerResponse = await clubKonnectService.buyData({
-          network: mappedNetwork,
-          dataplan: plan.dataValue,
-          phone,
-          request_id: requestId,
-        });
+        providerResponse =
+          await clubKonnectService.buyData({
 
-      } else if (plan.provider === "SMEPLUG") {
+            network: mappedNetwork,
 
-        if (!plan.smeplugNetworkId || !plan.smeplugPlanId) {
+            dataplan: plan.dataValue,
+
+            phone,
+
+            request_id: requestId,
+          });
+      }
+
+      // ==================================================
+      // SMEPLUG
+      // ==================================================
+
+      else if (
+        String(plan.provider).toUpperCase() ===
+        "SMEPLUG"
+      ) {
+
+        if (
+          !plan.smeplugNetworkId ||
+          !plan.smeplugPlanId
+        ) {
 
           await creditWalletIdempotent(
             uid,
             "REFUND-" + requestId,
             amountKobo,
-            { reason: "smeplug_config_error" }
+            {
+              reason: "smeplug_config_error",
+            }
           );
 
           return res.status(400).json({
-            error: "SMEplug plan not configured properly",
-            note: "Missing networkId or planId",
+            status: false,
+            error:
+              "SMEPlug plan not configured properly",
+            note:
+              "Missing networkId or planId",
           });
         }
 
-        providerResponse = await smeplugService.buyData({
-          network_id: plan.smeplugNetworkId,
-          plan_id: plan.smeplugPlanId,
-          phone,
-        });
+        providerResponse =
+          await smeplugService.buyData({
 
-      } else {
+            network_id:
+              plan.smeplugNetworkId,
+
+            plan_id:
+              plan.smeplugPlanId,
+
+            phone,
+
+            request_id: requestId,
+          });
+      }
+
+      // ==================================================
+      // UNKNOWN PROVIDER
+      // ==================================================
+
+      else {
 
         await creditWalletIdempotent(
           uid,
           "REFUND-" + requestId,
           amountKobo,
-          { reason: "unsupported_provider" }
+          {
+            reason: "unsupported_provider",
+          }
         );
 
         return res.status(400).json({
+          status: false,
           error: "Unsupported provider",
         });
       }
 
-    } catch (err) {
+    } catch (providerError) {
 
-      // 🔁 Refund if provider call fails
+      console.error(
+        "DATA PROVIDER EXCEPTION:",
+        providerError
+      );
+
+      /*
+       * Provider call threw an exception before
+       * we received a usable response.
+       *
+       * Refund user.
+       */
       await creditWalletIdempotent(
         uid,
         "REFUND-" + requestId,
         amountKobo,
-        { reason: "provider_request_failed" }
+        {
+          reason: "provider_request_failed",
+        }
       );
 
       return res.status(500).json({
+        status: false,
         error: "Provider request failed",
-        detail: err.response?.data || err.message,
+
+        detail:
+          providerError?.response?.data ||
+          providerError?.message ||
+          providerError,
       });
     }
 
-    // ================= 3️⃣ CHECK PROVIDER STATUS =================
-    if (providerResponse.status !== "success") {
+    // ==================================================
+    // 7. LOG NORMALIZED PROVIDER RESPONSE
+    // ==================================================
 
-      await creditWalletIdempotent(
-        uid,
-        "REFUND-" + requestId,
-        amountKobo,
-        { reason: "data_purchase_failed" }
-      );
+    console.log(
+      "NORMALIZED DATA PROVIDER RESPONSE:",
+      JSON.stringify(
+        providerResponse,
+        null,
+        2
+      )
+    );
 
-      return res.status(400).json({
-        error: "Data purchase failed",
-        detail: providerResponse,
+    // ==================================================
+    // 8. PROVIDER SUCCESS
+    // ==================================================
+
+    if (
+      providerResponse &&
+      providerResponse.status === "success"
+    ) {
+
+      // ==================================================
+      // SAVE SUCCESS TRANSACTION
+      // ==================================================
+
+      await Transaction.create({
+
+        userId: uid,
+
+        phone,
+
+        network: plan.network,
+
+        provider: plan.provider,
+
+        dataPlan: plan._id,
+
+        amount: plan.sellingPrice,
+
+        requestId,
+
+        providerReference:
+          providerResponse.reference ||
+          requestId,
+
+        status: "success",
+
+        providerResponse:
+          providerResponse.raw ||
+          providerResponse,
+      });
+
+      // ==================================================
+      // SUCCESS RESPONSE TO FLUTTER
+      // ==================================================
+
+      return res.status(200).json({
+
+        status: true,
+
+        message:
+          providerResponse.message ||
+          "Data purchase successful",
+
+        requestId,
+
+        transactionId: requestId,
+
+        reference:
+          providerResponse.reference ||
+          requestId,
       });
     }
 
-    // ================= 4️⃣ SAVE TRANSACTION =================
-    await Transaction.create({
-      userId: uid,
-      phone,
-      network: plan.network,
-      provider: plan.provider,
-      dataPlan: plan._id,
-      amount: plan.sellingPrice,
-      requestId,
-      providerReference: providerResponse.reference,
-      status: "success",
-      providerResponse,
-    });
+    // ==================================================
+    // 9. PROVIDER PENDING
+    // ==================================================
 
-    // ================= 5️⃣ SUCCESS RESPONSE =================
-    return res.json({
-      status: true,
-      message: "Data purchase successful",
-      requestId,
+    if (
+      providerResponse &&
+      providerResponse.status === "pending"
+    ) {
+
+      /*
+       * VERY IMPORTANT:
+       *
+       * Do NOT automatically refund here.
+       *
+       * The provider may have accepted the order
+       * and may still be processing it.
+       */
+
+      await Transaction.create({
+
+        userId: uid,
+
+        phone,
+
+        network: plan.network,
+
+        provider: plan.provider,
+
+        dataPlan: plan._id,
+
+        amount: plan.sellingPrice,
+
+        requestId,
+
+        providerReference:
+          providerResponse.reference ||
+          requestId,
+
+        status: "pending",
+
+        providerResponse:
+          providerResponse.raw ||
+          providerResponse,
+      });
+
+      return res.status(200).json({
+
+        status: true,
+
+        pending: true,
+
+        message:
+          providerResponse.message ||
+          "Data purchase is being processed",
+
+        requestId,
+
+        transactionId: requestId,
+
+        reference:
+          providerResponse.reference ||
+          requestId,
+      });
+    }
+
+    // ==================================================
+    // 10. REAL PROVIDER FAILURE
+    // ==================================================
+
+    console.error(
+      "DATA PROVIDER FAILED:",
+      JSON.stringify(
+        providerResponse,
+        null,
+        2
+      )
+    );
+
+    await creditWalletIdempotent(
+      uid,
+      "REFUND-" + requestId,
+      amountKobo,
+      {
+        reason: "data_purchase_failed",
+        provider:
+          plan.provider,
+      }
+    );
+
+    return res.status(400).json({
+
+      status: false,
+
+      error:
+        providerResponse?.error ||
+        "Data purchase failed",
+
+      detail:
+        providerResponse?.raw ||
+        providerResponse,
     });
 
   } catch (err) {
-    console.error("Buy data failed:", err);
+
+    console.error(
+      "BUY DATA INTERNAL ERROR:",
+      err
+    );
+
+    /*
+     * Only refund if this transaction was actually
+     * debited and we haven't already handled the refund.
+     */
+    if (walletDebited && uid && requestId) {
+
+      try {
+
+        await creditWalletIdempotent(
+          uid,
+          "REFUND-" + requestId,
+          amountKobo,
+          {
+            reason:
+              "buy_data_internal_error",
+          }
+        );
+
+      } catch (refundError) {
+
+        console.error(
+          "REFUND ERROR:",
+          refundError
+        );
+      }
+    }
+
     return res.status(500).json({
+
       status: false,
-      error: "Internal server error",
+
+      error:
+        "Internal server error",
     });
   }
 };
