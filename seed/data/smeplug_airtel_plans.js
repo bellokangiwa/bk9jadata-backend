@@ -1,50 +1,11 @@
 module.exports = [
   // ===== DAILY =====
-  {
+   {
     network: "AIRTEL",
     provider: "SMEPLUG",
     category: "AWOOF",
     planType: "DAILY",
-    name: "150MB Awoof Daily",
-    apiCode: "320",
-    smeplugNetworkId: 2,
-    smeplugPlanId: 320,
-    costPrice: 50,
-    sellingPrice: 60,
-    status: "active"
-  },
-  {
-    network: "AIRTEL",
-    provider: "SMEPLUG",
-    category: "AWOOF",
-    planType: "DAILY",
-    name: "300MB Awoof 2Days",
-    apiCode: "321",
-    smeplugNetworkId: 2,
-    smeplugPlanId: 321,
-    costPrice: 100,
-    sellingPrice: 120,
-    status: "active"
-  },
-  {
-    network: "AIRTEL",
-    provider: "SMEPLUG",
-    category: "AWOOF",
-    planType: "DAILY",
-    name: "600MB Awoof 2Days",
-    apiCode: "322",
-    smeplugNetworkId: 2,
-    smeplugPlanId: 322,
-    costPrice: 200,
-    sellingPrice: 250,
-    status: "active"
-  },
-  {
-    network: "AIRTEL",
-    provider: "SMEPLUG",
-    category: "AWOOF",
-    planType: "DAILY",
-    name: "Binge 1.5GB  Awoof Daily ",
+    name: "Binge 1.5GB  Awoof 1Day",
     apiCode: "407",
     smeplugNetworkId: 2,
     smeplugPlanId: 407,
@@ -61,23 +22,11 @@ module.exports = [
     apiCode: "409",
     smeplugNetworkId: 2,
     smeplugPlanId: 409,
-    costPrice: 800,
-    sellingPrice: 850,
+    costPrice: 750,
+    sellingPrice: 800,
     status: "active"
   },
-  {
-    network: "AIRTEL",
-    provider: "SMEPLUG",
-    category: "AWOOF",
-    planType: "DAILY",
-    name: "3.2GB Awoof 3Days",
-    apiCode: "448",
-    smeplugNetworkId: 2,
-    smeplugPlanId: 448,
-    costPrice: 500,
-    sellingPrice: 550,
-    status: "active"
-  },
+  
   {
     network: "AIRTEL",
     provider: "SMEPLUG",
@@ -135,7 +84,7 @@ module.exports = [
     network: "AIRTEL",
     provider: "SMEPLUG",
     category: "AWOOF",
-    planType: "MONTHLY",
+    planType: "DAILY",
     name: "2GB Awoof 2Days",
     apiCode: "394",
     smeplugNetworkId: 2,

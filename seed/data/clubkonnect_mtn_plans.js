@@ -24,16 +24,6 @@ module.exports = [
   {
     network: "MTN",
     provider: "CLUBKONNECT",
-    category: "CORPORATE",
-    planType: "WEEKLY",
-    name: "500MB Corporate Weekly",
-    dataValue: 500.02,
-    costPrice: 485,
-    sellingPrice: 520,
-  },
-  {
-    network: "MTN",
-    provider: "CLUBKONNECT",
     category: "SME",
     planType: "WEEKLY",
     name: "500MB SME Weekly",
@@ -51,16 +41,7 @@ module.exports = [
     costPrice: 410,
     sellingPrice: 420,
   },
-  {
-    network: "MTN",
-    provider: "CLUBKONNECT",
-    category: "CORPORATE",
-    planType: "WEEKLY",
-    name: "1GB Corporate Weekly",
-    dataValue: 800.01,
-    costPrice: 776,
-    sellingPrice: 800,
-  },
+  
 {
     network: "MTN",
     provider: "CLUBKONNECT",

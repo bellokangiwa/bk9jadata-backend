@@ -160,32 +160,7 @@ module.exports = [
     sellingPrice: 2100,
     status: "active"
   },
-  {
-    network: "MTN",
-    provider: "SMEPLUG",
-    category: "SOCIAL",
-    planType: "WEEKLY",
-    name: "40MB Facebook Weekly",
-    apiCode: "246",
-    smeplugNetworkId: 1,
-    smeplugPlanId: 246,
-    costPrice: 49,
-    sellingPrice: 50,
-    status: "active"
-  },
-  {
-    network: "MTN",
-    provider: "SMEPLUG",
-    category: "SOCIAL",
-    planType: "WEEKLY",
-    name: "40MB WatsApp Weekly",
-    apiCode: "247",
-    smeplugNetworkId: 1,
-    smeplugPlanId: 247,
-    costPrice: 49,
-    sellingPrice: 50,
-    status: "active"
-  },
+
   {
     network: "MTN",
     provider: "SMEPLUG",
@@ -240,20 +215,7 @@ module.exports = [
   },
 
   // ===== SME (MONTHLY – BEST SELLERS) =====
-  {
-    network: "MTN",
-    provider: "SMEPLUG",
-    category: "SME",
-    planType: "MONTHLY",
-    name: "500MB SME Monthly",
-    apiCode: "172",
-    smeplugNetworkId: 1,
-    smeplugPlanId: 172,
-    costPrice: 395,
-    sellingPrice: 420,
-    status: "active"
-  },
-  {
+   {
     network: "MTN",
     provider: "SMEPLUG",
     category: "SME",
@@ -266,6 +228,7 @@ module.exports = [
     sellingPrice: 580,
     status: "active"
   },
+  
   {
     network: "MTN",
     provider: "SMEPLUG",
