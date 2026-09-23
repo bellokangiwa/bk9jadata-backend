@@ -3,6 +3,8 @@ const Transaction = require("../models/Transaction");
 const { creditWalletIdempotent } =require("./walletController");
 const { debitWallet } =require("./walletController");
 const createAdminLog =require("../utils/adminLog");
+const clubKonnectService = require("../services/clubkonnectService");
+const smeplugService = require("../services/smeplugService");
 
 exports.getAllTransactions = async (req, res) => {
   const page = Number(req.query.page || 1);
@@ -28,35 +30,41 @@ exports.getTransactionById = async (req, res) => {
 
   res.json(tx);
 };
-exports.verifyTransactionManually = async (req, res) => {
-  const tx = await Transaction.findById(req.params.id);
-  if (!tx) return res.status(404).json({ error: "Not found" });
+// ==========================================
+// GET ALL TRANSACTIONS
+// ==========================================
+exports.getAllTransactions = async (req, res) => {
+  try {
+    const page = Math.max(Number(req.query.page || 1), 1);
+    const limit = Math.max(Number(req.query.limit || 100), 1);
+    const skip = (page - 1) * limit;
 
-  // Example for ClubKonnect
-  const response = await axios.get(
-    `https://www.nellobytesystems.com/APIQuery.asp`,
-    {
-      params: {
-        UserID: process.env.CLUBKONNECT_USER_ID,
-        APIKey: process.env.CLUBKONNECT_API_KEY,
-        RequestID: tx.requestId,
-      },
-    }
-  );
+    const transactions = await Transaction.find()
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit)
+      .lean();
 
-  tx.providerResponse = response.data;
+    const total = await Transaction.countDocuments();
 
-  if (response.data?.status === "success") {
-    tx.status = "success";
-  } else {
-    tx.status = "failed";
+    return res.json({
+      success: true,
+      page,
+      limit,
+      total,
+      totalPages: Math.ceil(total / limit),
+      transactions,
+    });
+  } catch (error) {
+    console.error("Get all transactions error:", error);
+
+    return res.status(500).json({
+      success: false,
+      error: "Failed to load transactions",
+      message: error.message,
+    });
   }
-
-  await tx.save();
-
-  res.json({ message: "Verification complete", tx });
 };
-
 const admin = require("firebase-admin");
 
 // 🔐 Admin reset user password
@@ -111,34 +119,57 @@ return res.status(500).json({
 
 }
 };
+// ==========================================
+// GET TRANSACTIONS BY STATUS
+// ==========================================
 exports.getTransactionsByStatus = async (req, res) => {
   try {
     const { status } = req.query;
 
     if (!status) {
       return res.status(400).json({
-        error: "Status query is required (e.g. ?status=success)",
+        success: false,
+        error: "Status query is required",
       });
     }
 
-  const transactions = await Transaction.find({ status })
-      .sort({ createdAt: -1 });
+    const allowedStatuses = [
+      "pending",
+      "success",
+      "failed",
+    ];
+
+    if (!allowedStatuses.includes(status.toLowerCase())) {
+      return res.status(400).json({
+        success: false,
+        error: "Invalid transaction status",
+      });
+    }
+
+    const transactions = await Transaction.find({
+      status: status.toLowerCase(),
+    })
+      .sort({ createdAt: -1 })
+      .limit(100)
+      .lean();
 
     return res.json({
-      status: true,
+      success: true,
+      status: status.toLowerCase(),
       count: transactions.length,
       transactions,
     });
+  } catch (error) {
+    console.error("Get transactions by status error:", error);
 
-  } catch (err) {
-    console.error("Get transactions by status error:", err);
     return res.status(500).json({
-      error: "Internal server error",
+      success: false,
+      error: "Failed to load transactions",
+      message: error.message,
     });
   }
 };
 // ===== CREDIT USER WALLET =====
-
 
 exports.creditUserWallet = async (req, res) => {
 try {
@@ -250,4 +281,40 @@ return res.status(500).json({
 });
 
 }
+};
+// ============================================================
+// GET CLUBKONNECT + SMEPLUG BALANCES
+// ============================================================
+exports.getProviderBalances = async (req, res) => {
+  try {
+    console.log("==========================================");
+    console.log("LOADING PROVIDER BALANCES...");
+    console.log("==========================================");
+
+    const [clubKonnect, smeplug] = await Promise.all([
+      clubKonnectService.getBalance(),
+      smeplugService.getBalance(),
+    ]);
+
+    console.log("==========================================");
+    console.log("PROVIDER BALANCES LOADED");
+    console.log("==========================================");
+
+    return res.json({
+      success: true,
+      clubKonnect,
+      smeplug,
+    });
+  } catch (error) {
+    console.error(
+      "Provider balance controller error:",
+      error
+    );
+
+    return res.status(500).json({
+      success: false,
+      error: "Failed to load provider balances",
+      message: error.message,
+    });
+  }
 };

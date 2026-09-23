@@ -339,6 +339,54 @@ const clubKonnectService = {
       };
     }
   },
+  // ============================================================
+  // GET CLUBKONNECT WALLET BALANCE
+  // ============================================================
+  getBalance: async () => {
+    try {
+      const response = await axios.get(
+        "https://www.nellobytesystems.com/APIWalletBalanceV1.asp",
+        {
+          params: {
+            UserID: USER_ID,
+            APIKey: API_KEY,
+          },
+          timeout: 30000,
+        }
+      );
+
+      console.log(
+        "=========================================="
+      );
+
+      console.log(
+        "CLUBKONNECT WALLET BALANCE:"
+      );
+
+      console.log(
+        JSON.stringify(response.data, null, 2)
+      );
+
+      console.log(
+        "=========================================="
+      );
+
+      return response.data;
+    } catch (err) {
+      console.error(
+        "ClubKonnect balance error:",
+        err.response?.data || err.message
+      );
+
+      return {
+        success: false,
+        error:
+          err.response?.data ||
+          err.message,
+      };
+    }
+  },
+
 };
 
 // ============================================================

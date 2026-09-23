@@ -20,16 +20,7 @@ module.exports = [
     costPrice: 725.91,
     sellingPrice: 780,
   },
-  {
-    network: "AIRTEL",
-    provider: "CLUBKONNECT",
-    category: "AWOOF",
-    planType: "DAILY",
-    name: "3GB Awoof 2Days",
-    dataValue: 999.91,
-    costPrice: 967.91,
-    sellingPrice: 1050,
-  },
+  
   {
     network: "AIRTEL",
     provider: "CLUBKONNECT",

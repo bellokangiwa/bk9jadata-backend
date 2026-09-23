@@ -4,7 +4,53 @@ const SMEPLUG_BASE_URL = process.env.SMEPLUG_BASE_URL;
 const SMEPLUG_SECRET_KEY = process.env.SMEPLUG_SECRET_KEY;
 
 const smeplugService = {
+// ==================================================
+  // GET SMEPLUG ACCOUNT BALANCE
+  // ==================================================
+  getBalance: async () => {
+    try {
+      const response = await axios.get(
+        "https://smeplug.ng/api/v1/account/balance",
+        {
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${SMEPLUG_SECRET_KEY}`,
+          },
+          timeout: 30000,
+        }
+      );
 
+      console.log(
+        "=========================================="
+      );
+
+      console.log(
+        "SMEPLUG ACCOUNT BALANCE:"
+      );
+
+      console.log(
+        JSON.stringify(response.data, null, 2)
+      );
+
+      console.log(
+        "=========================================="
+      );
+
+      return response.data;
+    } catch (err) {
+      console.error(
+        "SMEPlug balance error:",
+        err.response?.data || err.message
+      );
+
+      return {
+        success: false,
+        error:
+          err.response?.data ||
+          err.message,
+      };
+    }
+  },
   // ==================================================
   // BUY DATA
   // ==================================================
