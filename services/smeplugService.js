@@ -52,6 +52,130 @@ const smeplugService = {
     }
   },
   // ==================================================
+  // BUY AIRTIME
+  // ==================================================
+  buyAirtime: async ({
+    network_id,
+    phone,
+    amount,
+    request_id,
+  }) => {
+    try {
+      const response = await axios.post(
+        `${SMEPLUG_BASE_URL}/airtime/purchase`,
+
+        {
+          network_id,
+          phone,
+          amount,
+        },
+
+        {
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${SMEPLUG_SECRET_KEY}`,
+          },
+
+          timeout: 45000,
+        }
+      );
+
+      const result = response.data;
+
+      console.log(
+        "=========================================="
+      );
+
+      console.log(
+        "SMEPLUG AIRTIME RESPONSE:"
+      );
+
+      console.log(
+        JSON.stringify(result, null, 2)
+      );
+
+      console.log(
+        "=========================================="
+      );
+
+      // ==================================================
+      // AIRTIME SUCCESS
+      // ==================================================
+      if (result?.status === true) {
+        return {
+          status: "success",
+
+          requestId:
+            request_id || null,
+
+          reference:
+            result?.data?.reference ||
+            result?.reference ||
+            request_id ||
+            null,
+
+          message:
+            result?.data?.msg ||
+            result?.message ||
+            "Airtime purchase successful",
+
+          raw: result,
+        };
+      }
+
+      // ==================================================
+      // AIRTIME FAILED
+      // ==================================================
+      return {
+        status: "failed",
+
+        requestId:
+          request_id || null,
+
+        error:
+          result?.data?.msg ||
+          result?.message ||
+          result?.error ||
+          "SMEPlug airtime purchase failed",
+
+        raw: result,
+      };
+
+    } catch (err) {
+      console.error(
+        "=========================================="
+      );
+
+      console.error(
+        "SMEPLUG AIRTIME ERROR:"
+      );
+
+      console.error(
+        err.response?.data ||
+        err.message
+      );
+
+      console.error(
+        "=========================================="
+      );
+
+      return {
+        status: "failed",
+
+        requestId:
+          request_id || null,
+
+        error:
+          err.response?.data ||
+          err.message,
+
+        raw:
+          err.response?.data ||
+          null,
+      };
+    }
+  },
+  // ==================================================
   // BUY DATA
   // ==================================================
   buyData: async ({

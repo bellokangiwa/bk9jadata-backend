@@ -61,8 +61,8 @@ module.exports = [
     apiCode: "433",
     smeplugNetworkId: 4,
     smeplugPlanId: 433,
-    costPrice: 870,
-    sellingPrice: 900,
+    costPrice: 1005,
+    sellingPrice: 1050,
     status: "active",
   },
 

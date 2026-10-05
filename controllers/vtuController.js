@@ -37,119 +37,370 @@ function calculateDiscount(network, amount) {
 }
 
 // ================== BUY AIRTIME ==================
+// ================== BUY AIRTIME WITH SMEPLUG ==================
 exports.buyAirtime = async (req, res) => {
   try {
+    // ==========================================================
+    // AUTHENTICATION
+    // ==========================================================
     const uid = req.auth?.uid;
+
     if (!uid) {
-      return res.status(401).json({ error: "Unauthorized" });
+      return res.status(401).json({
+        error: "Unauthorized",
+      });
     }
 
+    // ==========================================================
+    // GET REQUEST DATA
+    // ==========================================================
     const network = req.body.network?.toUpperCase();
-    const amount = req.body.amount;
+    const amount = Number(req.body.amount);
     const phone = req.body.phone;
+
+    // ==========================================================
+    // VALIDATE REQUIRED FIELDS
+    // ==========================================================
     if (!network || !amount || !phone) {
-  return res.status(400).json({ error: "Missing required fields" });
-}
-
-if (amount < 50) {
-  return res.status(400).json({
-    error: "Minimum airtime purchase is ₦50",
-  });
-}
-
-    // Convert network
-    const providerNetwork = clubKonnectNetworkMap[network];
-    if (!providerNetwork) {
-      return res.status(400).json({ error: "Invalid network" });
+      return res.status(400).json({
+        error: "Missing required fields",
+      });
     }
 
-    const requestId = generateRequestID();
-    const finalAmount = calculateDiscount(network, amount);
-    const amountKobo = Math.round(finalAmount * 100);
+    // ==========================================================
+    // VALIDATE AMOUNT
+    // Minimum airtime purchase = ₦50
+    // ==========================================================
+    if (amount < 50) {
+      return res.status(400).json({
+        error: "Minimum airtime purchase is ₦50",
+      });
+    }
 
-    // 1️⃣ DEBIT WALLET FIRST
+    // ==========================================================
+    // VALIDATE PHONE NUMBER
+    // ==========================================================
+    if (!/^0\d{10}$/.test(phone)) {
+      return res.status(400).json({
+        error: "Invalid phone number",
+      });
+    }
+
+    // ==========================================================
+    // SMEPLUG NETWORK MAPPING
+    // ==========================================================
+    const smePlugNetworkMap = {
+      MTN: 1,
+      AIRTEL: 2,
+      "9MOBILE": 3,
+      GLO: 4,
+    };
+
+    const providerNetwork =
+      smePlugNetworkMap[network];
+
+    if (!providerNetwork) {
+      return res.status(400).json({
+        error: "Invalid network",
+      });
+    }
+
+    // ==========================================================
+    // GENERATE REQUEST ID
+    // ==========================================================
+    const requestId = generateRequestID();
+
+    // ==========================================================
+    // CUSTOMER DISCOUNT
+    //
+    // User buys ₦100  -> pays ₦98
+    // User buys ₦500  -> pays ₦498
+    // User buys ₦1000 -> pays ₦998
+    //
+    // Same ₦2 discount for every network.
+    // ==========================================================
+    const discount = 2;
+
+    const customerCharge = amount - discount;
+
+    // ==========================================================
+    // SAFETY CHECK
+    // ==========================================================
+    if (customerCharge <= 0) {
+      return res.status(400).json({
+        error: "Invalid airtime amount",
+      });
+    }
+
+    const amountKobo =
+      Math.round(customerCharge * 100);
+
+    // ==========================================================
+    // LOG PURCHASE INFORMATION
+    // ==========================================================
+    console.log(
+      "=========================================="
+    );
+
+    console.log(
+      "SMEPLUG AIRTIME PURCHASE"
+    );
+
+    console.log(
+      "User ID:",
+      uid
+    );
+
+    console.log(
+      "Network:",
+      network
+    );
+
+    console.log(
+      "SMEPlug Network ID:",
+      providerNetwork
+    );
+
+    console.log(
+      "Phone:",
+      phone
+    );
+
+    console.log(
+      "Requested Airtime:",
+      amount
+    );
+
+    console.log(
+      "Customer Discount:",
+      discount
+    );
+
+    console.log(
+      "Customer Wallet Charge:",
+      customerCharge
+    );
+
+    console.log(
+      "Request ID:",
+      requestId
+    );
+
+    console.log(
+      "=========================================="
+    );
+
+    // ==========================================================
+    // 1️⃣ DEBIT CUSTOMER WALLET
+    //
+    // Example:
+    // Airtime = ₦100
+    // Customer pays = ₦98
+    // ==========================================================
     const debitResult = await debitWallet(
       uid,
       requestId,
       amountKobo,
-      { purpose: "buy_airtime" }
+      {
+        purpose: "buy_airtime",
+        network,
+        amount,
+        discount,
+        customerCharge,
+        provider: "SMEPLUG",
+      }
     );
 
     if (!debitResult.success) {
-      return res.status(400).json({ error: "Insufficient wallet balance" });
+      return res.status(400).json({
+        error: "Insufficient wallet balance",
+      });
     }
 
-    // 2️⃣ CALL PROVIDER
+    // ==========================================================
+    // 2️⃣ CALL SMEPLUG
+    // ==========================================================
     let providerResponse;
+
     try {
-      providerResponse = await axios.get(
-        process.env.CLUBKONNECT_AIRTIME_URL,
-        {
-          params: {
-            UserID: process.env.CLUBKONNECT_USER_ID,
-            APIKey: process.env.CLUBKONNECT_API_KEY,
-            MobileNetwork: providerNetwork,
-            Amount: amount,
-            MobileNumber: phone,
-            RequestID: requestId,
-          },
-        }
-      );
+      providerResponse =
+        await smeplugService.buyAirtime({
+          network_id: providerNetwork,
+          phone,
+          amount,
+          request_id: requestId,
+        });
+
     } catch (err) {
-      // 🔁 REFUND ON PROVIDER FAILURE
+      console.error(
+        "=========================================="
+      );
+
+      console.error(
+        "SMEPLUG AIRTIME PROVIDER ERROR:"
+      );
+
+      console.error(
+        err.response?.data ||
+        err.message
+      );
+
+      console.error(
+        "=========================================="
+      );
+
+      // ========================================================
+      // REFUND CUSTOMER
+      // ========================================================
       await creditWalletIdempotent(
         uid,
         "REFUND-" + requestId,
         amountKobo,
-        { reason: "airtime_provider_failed" }
+        {
+          reason: "airtime_provider_failed",
+          provider: "SMEPLUG",
+        }
       );
 
       return res.status(500).json({
         error: "Provider request failed",
-        detail: err.response?.data || err.message,
+        detail:
+          err.response?.data ||
+          err.message,
       });
     }
 
-    const clubResponse = providerResponse.data;
+    // ==========================================================
+    // LOG PROVIDER RESPONSE
+    // ==========================================================
+    console.log(
+      "=========================================="
+    );
 
-    // 3️⃣ CHECK PROVIDER STATUS
-    if (clubResponse.statuscode !== "100") {
+    console.log(
+      "SMEPLUG AIRTIME RESULT:"
+    );
+
+    console.log(
+      JSON.stringify(
+        providerResponse,
+        null,
+        2
+      )
+    );
+
+    console.log(
+      "=========================================="
+    );
+
+    // ==========================================================
+    // 3️⃣ CHECK SMEPLUG RESULT
+    // ==========================================================
+    if (
+      !providerResponse ||
+      providerResponse.status !== "success"
+    ) {
+      console.error(
+        "SMEPLUG AIRTIME FAILED:"
+      );
+
+      console.error(
+        JSON.stringify(
+          providerResponse,
+          null,
+          2
+        )
+      );
+
+      // ========================================================
+      // REFUND CUSTOMER
+      // ========================================================
       await creditWalletIdempotent(
         uid,
         "REFUND-" + requestId,
         amountKobo,
-        { reason: "airtime_failed" }
+        {
+          reason: "airtime_failed",
+          provider: "SMEPLUG",
+        }
       );
 
       return res.status(400).json({
         error: "Airtime purchase failed",
-        detail: clubResponse,
+        detail: providerResponse,
       });
     }
 
-    // 4️⃣ SAVE TRANSACTION
+    // ==========================================================
+    // 4️⃣ GET SMEPLUG REFERENCE
+    // ==========================================================
+    const providerReference =
+      providerResponse.reference ||
+      requestId;
+
+    // ==========================================================
+    // 5️⃣ SAVE TRANSACTION
+    // ==========================================================
     await Transaction.create({
       userId: uid,
-      orderId: clubResponse.orderid,
+
+      orderId: providerReference,
+
       phone,
+
       network,
-      provider: "CLUBKONNECT",
+
+      provider: "SMEPLUG",
+
       amount,
+
       requestId,
+
       status: "success",
-      providerResponse: clubResponse,
+
+      providerResponse:
+        providerResponse.raw,
     });
 
-    // 5️⃣ SUCCESS RESPONSE
+    // ==========================================================
+    // 6️⃣ SUCCESS RESPONSE
+    // ==========================================================
     return res.status(200).json({
       success: true,
-      message: "Airtime purchase successful",
+
+      message:
+        providerResponse.message ||
+        "Airtime purchase successful",
+
       requestId,
-      orderId: clubResponse.orderid,
+
+      orderId: providerReference,
+
+      amount,
+
+      customerCharge,
+
+      discount,
     });
 
   } catch (err) {
-    console.error("Buy airtime error:", err);
+    // ==========================================================
+    // GLOBAL ERROR
+    // ==========================================================
+    console.error(
+      "=========================================="
+    );
+
+    console.error(
+      "BUY AIRTIME ERROR:"
+    );
+
+    console.error(err);
+
+    console.error(
+      "=========================================="
+    );
+
     return res.status(500).json({
       status: false,
       error: "Internal server error",
