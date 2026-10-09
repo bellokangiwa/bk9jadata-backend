@@ -1,7 +1,7 @@
 // utils/fees.js
 
-const PAYSTACK_FEE_PERCENT = 1; // %
-const MY_FEE_PERCENT = 1;      // %
+const PAYSTACK_FEE_PERCENT = 0.5; // %
+const MY_FEE_PERCENT = 0.5;      // %
 
 const nairaToKobo = (amount) => Math.round(amount * 100);
 const koboToNaira = (amount) => amount / 100;
