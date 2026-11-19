@@ -6,6 +6,7 @@ const { clubKonnectNetworkMap } = require("../utils/networkMapper");
 const { rechargeCardNetworkMap } = require("../utils/networkMapper");
 const smeplugService = require("../services/smeplugService");
 const clubKonnectService = require("../services/clubkonnectService");
+const rufisDataService = require("../services/rufisdataService");
 
 // ================= HELPERS =================
 // Generates a unique request ID for each transaction
@@ -183,7 +184,7 @@ exports.buyData = async (req, res) => {
     // 2. INPUT
     // ==================================================
 
-    const { planId, phone } = req.body;
+    const { planId, phone, portedNumber = true } = req.body;
 
     if (!planId || !phone) {
       return res.status(400).json({
@@ -346,6 +347,47 @@ exports.buyData = async (req, res) => {
 
             request_id: requestId,
           });
+      }
+
+      // ==================================================
+      // RUFISDATA
+      // ==================================================
+
+      else if (
+        String(plan.provider).toUpperCase() ===
+        "RUFISDATA"
+      ) {
+
+        const rufisNetworkId = Number(plan.rufisNetworkId);
+        const rufisPlanId = Number(plan.rufisDataId);
+
+        if (
+          !Number.isInteger(rufisNetworkId) ||
+          rufisNetworkId <= 0 ||
+          !Number.isInteger(rufisPlanId) ||
+          rufisPlanId <= 0
+        ) {
+
+          await creditWalletIdempotent(
+            uid,
+            "REFUND-" + requestId,
+            amountKobo,
+            { reason: "rufisdata_config_error" }
+          );
+
+          return res.status(400).json({
+            status: false,
+            error: "RufisData plan is not configured properly",
+            note: "Missing or invalid rufisNetworkId or rufisDataId",
+          });
+        }
+
+        providerResponse = await rufisDataService.buyData({
+          network: rufisNetworkId,
+          planId: rufisPlanId,
+          phone,
+          portedNumber: portedNumber === true || String(portedNumber).toLowerCase() === "true",
+        });
       }
 
       // ==================================================

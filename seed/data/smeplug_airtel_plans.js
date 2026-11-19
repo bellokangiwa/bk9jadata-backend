@@ -1,6 +1,6 @@
 module.exports = [
-  // ===== DAILY =====
-   {
+  // ===== DAILY =====  
+  {
     network: "AIRTEL",
     provider: "SMEPLUG",
     category: "AWOOF",
@@ -13,7 +13,7 @@ module.exports = [
     sellingPrice: 500,
     status: "active"
   },
-  {
+    {
     network: "AIRTEL",
     provider: "SMEPLUG",
     category: "AWOOF",
@@ -23,38 +23,10 @@ module.exports = [
     smeplugNetworkId: 2,
     smeplugPlanId: 409,
     costPrice: 750,
-    sellingPrice: 800,
+    sellingPrice: 850,
     status: "active"
   },
-  
-  {
-    network: "AIRTEL",
-    provider: "SMEPLUG",
-    category: "AWOOF",
-    planType: "DAILY",
-    name: "6.5GB Awoof 7Days",
-    apiCode: "449",
-    smeplugNetworkId: 2,
-    smeplugPlanId: 409,
-    costPrice: 1000,
-    sellingPrice: 1100,
-    status: "active"
-  },
-
-  {
-    network: "AIRTEL",
-    provider: "SMEPLUG",
-    category: "AWOOF",
-    planType: "WEEKLY",
-    name: "5GB Awoof Weekly",
-    apiCode: "410",
-    smeplugNetworkId: 2,
-    smeplugPlanId: 410,
-    costPrice: 1500,
-    sellingPrice: 1600,
-    status: "active"
-  },
-  {
+{
     network: "AIRTEL",
     provider: "SMEPLUG",
     category: "AWOOF",
@@ -80,17 +52,4 @@ module.exports = [
     sellingPrice: 5100,
     status: "active"
   },
-  {
-    network: "AIRTEL",
-    provider: "SMEPLUG",
-    category: "AWOOF",
-    planType: "DAILY",
-    name: "2GB Awoof 2Days",
-    apiCode: "394",
-    smeplugNetworkId: 2,
-    smeplugPlanId: 394,
-    costPrice: 540,
-    sellingPrice: 580,
-    status: "active"
-  }
 ];
