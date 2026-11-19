@@ -1,3 +1,4 @@
+
 const mongoose = require("mongoose");
 
 const dataPlanSchema = new mongoose.Schema(
@@ -9,18 +10,26 @@ const dataPlanSchema = new mongoose.Schema(
       enum: ["MTN", "AIRTEL", "GLO", "9MOBILE"],
     },
 
-    // PROVIDER (backend only)
+    // PROVIDER
     provider: {
       type: String,
       required: true,
-      enum: ["SMEPLUG", "CLUBKONNECT"],
+      enum: ["SMEPLUG", "CLUBKONNECT", "RUFISDATA"],
     },
 
-    // CATEGORY (what users understand)
+    // CATEGORY SHOWN IN BK9JADATASUB
     category: {
       type: String,
       required: true,
-      enum: ["SME", "CORPORATE", "DIRECT", "AWOOF", "GIFTING", "SOCIAL", "SHARE"],
+      enum: [
+        "SME",
+        "CORPORATE",
+        "DIRECT",
+        "AWOOF",
+        "GIFTING",
+        "SOCIAL",
+        "SHARE",
+      ],
     },
 
     // DURATION
@@ -36,28 +45,65 @@ const dataPlanSchema = new mongoose.Schema(
       required: true,
     },
 
-    // SMEPLUG only
+    // =========================
+    // SMEPLUG FIELDS
+    // =========================
+
     apiCode: {
       type: String,
       default: null,
     },
-    // SMEPLUG ONLY
-smeplugNetworkId: {
-  type: Number,
-  default: null,
-},
 
-smeplugPlanId: {
-  type: Number,
-  default: null,
-},
-    // ClubKonnect only (e.g 1000, 500.01)
+    smeplugNetworkId: {
+      type: Number,
+      default: null,
+    },
+
+    smeplugPlanId: {
+      type: Number,
+      default: null,
+    },
+
+    // =========================
+    // CLUBKONNECT FIELDS
+    // =========================
+
     dataValue: {
       type: Number,
       default: null,
     },
 
+    // =========================
+    // RUFISDATA FIELDS
+    // =========================
+
+    // Data ID from RufisData price list
+    rufisDataId: {
+      type: Number,
+      default: null,
+    },
+
+    // RufisData network ID:
+    // MTN = 1
+    // GLO = 2
+    // 9MOBILE = 3
+    // AIRTEL = 4
+    rufisNetworkId: {
+      type: Number,
+      default: null,
+    },
+
+    // Original RufisData plan category
+    // e.g. SME, CORPORATE GIFTING, DATA SHARE
+    rufisPlanType: {
+      type: String,
+      default: null,
+    },
+
+    // =========================
     // PRICING
+    // =========================
+
     costPrice: {
       type: Number,
       required: true,
@@ -68,7 +114,10 @@ smeplugPlanId: {
       required: true,
     },
 
+    // =========================
     // STATUS
+    // =========================
+
     status: {
       type: String,
       enum: ["active", "disabled"],
