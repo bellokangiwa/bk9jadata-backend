@@ -1,3 +1,4 @@
+
 const mongoose = require("mongoose");
 
 const transactionSchema = new mongoose.Schema(
@@ -25,16 +26,17 @@ const transactionSchema = new mongoose.Schema(
     // Provider used
     provider: {
       type: String,
-      enum: ["SMEPLUG", "CLUBKONNECT"],
+      enum: ["SMEPLUG", "CLUBKONNECT", "RUFISDATA"],
       required: true,
     },
 
     // Data plan reference (optional for airtime)
-dataPlan: {
-  type: mongoose.Schema.Types.ObjectId,
-  ref: "DataPlan",
-  required: false, // now optional
-},
+    dataPlan: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "DataPlan",
+      required: false,
+    },
+
     // Amount charged to user (selling price)
     amount: {
       type: Number,
